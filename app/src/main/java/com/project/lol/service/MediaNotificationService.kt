@@ -51,7 +51,7 @@ class MediaNotificationService : Service() {
             PlaybackStateCompat.ACTION_STOP or
             PlaybackStateCompat.ACTION_SEEK_TO
 
-        private const val NOTIF_COLOR = 0xFFFFCC80.toInt()
+        private const val NOTIF_COLOR = 0xFFE0E0E0.toInt()
 
         var webView: WebView? = null
         var instance: MediaNotificationService? = null

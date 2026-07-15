@@ -2,22 +2,22 @@
 <resources>
     <!-- Spotify Brand Colors -->
     <color name="spotify_green">#FF1DB954</color>
-    <color name="spotify_black">#FF191414</color>
+    <color name="spotify_black">#FF000000</color>
     <color name="spotify_white">#FFFFFFFF</color>
-    <color name="spotify_dark_gray">#FF282828</color>
+    <color name="spotify_dark_gray">#FF121212</color>
     <color name="spotify_medium_gray">#FF535353</color>
     <color name="spotify_light_gray">#FFB3B3B3</color>
 
     <!-- Material 3 Primary Colors -->
-    <color name="primary">@color/spotify_green</color>
-    <color name="on_primary">@color/spotify_black</color>
-    <color name="primary_container">#FF1AA34A</color>
-    <color name="on_primary_container">@color/spotify_black</color>
+    <color name="primary">#FFE0E0E0</color>
+    <color name="on_primary">#FF121212</color>
+    <color name="primary_container">#FF2E2E2E</color>
+    <color name="on_primary_container">#FFF5F5F5</color>
 
     <!-- Material 3 Surface Colors -->
     <color name="surface">@color/spotify_black</color>
     <color name="on_surface">@color/spotify_white</color>
-    <color name="surface_variant">@color/spotify_dark_gray</color>
+    <color name="surface_variant">@color/spotify_black</color>
     <color name="on_surface_variant">@color/spotify_light_gray</color>
 
     <!-- Material 3 Background -->

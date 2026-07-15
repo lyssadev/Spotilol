@@ -45,8 +45,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val PastelOrange = Color(0xFFFFCC80)
-private val DarkText = Color(0xFF191414)
+private val MonochromeAccent = Color(0xFFE0E0E0)
+private val MonochromeText = Color(0xFFFFFFFF)
 
 class CertificateActivity : ComponentActivity() {
 
@@ -78,7 +78,7 @@ class CertificateActivity : ComponentActivity() {
                 }
             }
 
-            MaterialTheme(colorScheme = SpotifyDarkColors) {
+            SpotifyTheme {
                 when {
                     checking -> {
                         Column(
@@ -88,7 +88,7 @@ class CertificateActivity : ComponentActivity() {
                             verticalArrangement = Arrangement.Center,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            CircularProgressIndicator(color = PastelOrange)
+                            CircularProgressIndicator(color = MonochromeAccent)
                             Spacer(Modifier.height(16.dp))
                             Text(
                                 "Checking certificate...",
@@ -153,7 +153,7 @@ fun CACertDialog(
         Text(
             text = "Certificate Required",
             style = MaterialTheme.typography.headlineSmall,
-            color = PastelOrange,
+            color = MonochromeAccent,
             fontWeight = FontWeight.Bold
         )
 
@@ -196,7 +196,7 @@ fun CACertDialog(
                 onClick = onExport,
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Export .pem", color = PastelOrange)
+                Text("Export .pem", color = MonochromeAccent)
             }
 
             TextButton(
@@ -214,7 +214,7 @@ private fun Step(number: Int, text: String) {
     Row(verticalAlignment = Alignment.Top) {
         Surface(
             shape = CircleShape,
-            color = PastelOrange,
+            color = MonochromeAccent,
             modifier = Modifier.size(22.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {

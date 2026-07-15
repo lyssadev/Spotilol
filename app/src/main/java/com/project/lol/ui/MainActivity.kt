@@ -63,14 +63,18 @@ import com.project.lol.webview.SpotifyWebViewClient
 import java.lang.ref.WeakReference
 import java.util.concurrent.Executors
 
-private val PastelOrange = Color(0xFFFFCC80)
-private val DarkText = Color(0xFF191414)
+private val MonochromeHeader = Color(0xFF000000)
+private val MonochromeText = Color(0xFFFFFFFF)
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
     private var webView: WebView? = null
     private var serviceStarted = false
+
+    private val serviceEnabledState = mutableStateOf(true)
+    private val materialYouState = mutableStateOf(false)
+    private val amoledState = mutableStateOf(false)
 
     private val notifPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -86,12 +90,16 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
         val loggedIn = prefs.getBoolean("LoggedIn", false)
 
-        setContent {
-            val serviceEnabled = remember {
-                mutableStateOf(prefs.getBoolean("ServiceOn", true))
-            }
+        serviceEnabledState.value = prefs.getBoolean("ServiceOn", true)
+        materialYouState.value = prefs.getBoolean("MaterialYou", false)
+        amoledState.value = prefs.getBoolean("AmoledTheme", false)
 
-            SpotifyTheme {
+        setContent {
+            val serviceEnabled = serviceEnabledState.value
+            val materialYou = materialYouState.value
+            val amoled = amoledState.value
+
+            SpotifyTheme(useDynamicColor = materialYou, amoled = amoled) {
                 Scaffold(
                     topBar = {
                         TopAppBar(
@@ -108,14 +116,14 @@ class MainActivity : ComponentActivity() {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_settings),
                                         contentDescription = "Settings",
-                                        tint = DarkText
+                                        tint = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                                 Spacer(Modifier.width(4.dp))
                                 Switch(
-                                    checked = serviceEnabled.value,
+                                    checked = serviceEnabled,
                                     onCheckedChange = { newValue ->
-                                        serviceEnabled.value = newValue
+                                        serviceEnabledState.value = newValue
                                         prefs.edit()
                                             .putBoolean("ServiceOn", newValue)
                                             .apply()
@@ -126,23 +134,23 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = Color(0xFF1DB954),
-                                        uncheckedThumbColor = Color(0xFF888888),
-                                        uncheckedTrackColor = Color(0xFF444444)
+                                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                        checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                                     )
                                 )
                                 Spacer(Modifier.width(8.dp))
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = PastelOrange,
-                                titleContentColor = DarkText,
-                                actionIconContentColor = DarkText
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                                actionIconContentColor = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
                 ) { innerPadding ->
-                    if (serviceEnabled.value) {
+                    if (serviceEnabled) {
                         val bridge = remember {
                             SpotifyBridge(WeakReference(this@MainActivity))
                         }
@@ -186,7 +194,7 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     setInitialScale(100)
-                                    setBackgroundColor(0xFF444444.toInt())
+                                    setBackgroundColor(0xFF000000.toInt())
 
                                     if (WebViewFeature.isFeatureSupported(WebViewFeature.BACK_FORWARD_CACHE)) {
                                         WebSettingsCompat.setBackForwardCacheEnabled(settings, true)
@@ -292,6 +300,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        val prefs = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
+        serviceEnabledState.value = prefs.getBoolean("ServiceOn", true)
+        materialYouState.value = prefs.getBoolean("MaterialYou", false)
+        amoledState.value = prefs.getBoolean("AmoledTheme", false)
+
+        val customCss = prefs.getString("CustomCss", "") ?: ""
+        val amoledEnabled = prefs.getBoolean("AmoledTheme", false)
+
+        webView?.let { view ->
+            val js = SpotifyWebViewClient.buildAmoledJs(amoledEnabled) + "\n" +
+                    SpotifyWebViewClient.buildCustomCssJs(customCss)
+            view.evaluateJavascript(js, null)
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         val loggedIn = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
@@ -318,28 +343,52 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-internal val SpotifyDarkColors = androidx.compose.material3.darkColorScheme(
-    primary = Color(0xFF1DB954),
-    onPrimary = Color(0xFF000000),
-    primaryContainer = Color(0xFF1AA34A),
-    onPrimaryContainer = Color(0xFF000000),
-    secondary = Color(0xFF535353),
-    onSecondary = Color(0xFFFFFFFF),
-    tertiary = Color(0xFFB3B3B3),
-    onTertiary = Color(0xFF000000),
-    background = Color(0xFF121212),
-    onBackground = Color(0xFFFFFFFF),
-    surface = Color(0xFF191414),
-    onSurface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFF282828),
-    onSurfaceVariant = Color(0xFFB3B3B3),
-    outline = Color(0xFF535353),
-)
-
 @Composable
-fun SpotifyTheme(content: @Composable () -> Unit) {
+fun SpotifyTheme(
+    useDynamicColor: Boolean = false,
+    amoled: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    val context = LocalContext.current
+    val baseScheme = when {
+        useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            androidx.compose.material3.dynamicDarkColorScheme(context)
+        }
+        else -> androidx.compose.material3.darkColorScheme(
+            primary = Color(0xFFE0E0E0),
+            onPrimary = Color(0xFF121212),
+            primaryContainer = Color(0xFF2E2E2E),
+            onPrimaryContainer = Color(0xFFF5F5F5),
+            inversePrimary = Color(0xFF121212),
+            secondary = Color(0xFFCCCCCC),
+            onSecondary = Color(0xFF1A1A1A),
+            secondaryContainer = Color(0xFF262626),
+            onSecondaryContainer = Color(0xFFE0E0E0),
+            tertiary = Color(0xFFB0B0B0),
+            onTertiary = Color(0xFF181818),
+            tertiaryContainer = Color(0xFF202020),
+            onTertiaryContainer = Color(0xFFD6D6D6),
+            outline = Color(0xFF767676),
+            outlineVariant = Color(0xFF444444)
+        )
+    }
+
+    val colorScheme = if (amoled) {
+        baseScheme.copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceVariant = Color(0xFF0F0F0F),
+            surfaceContainer = Color.Black,
+            surfaceContainerLow = Color.Black,
+            surfaceContainerHigh = Color(0xFF141414),
+            surfaceContainerLowest = Color.Black,
+        )
+    } else {
+        baseScheme
+    }
+
     MaterialTheme(
-        colorScheme = SpotifyDarkColors,
+        colorScheme = colorScheme,
         content = content
     )
 }
