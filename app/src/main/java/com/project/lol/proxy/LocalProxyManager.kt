@@ -9,6 +9,8 @@ import android.provider.MediaStore
 import android.security.KeyChain
 import android.util.Base64
 import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKeys
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
@@ -42,7 +44,8 @@ import javax.net.ssl.SSLSocketFactory
 object LocalProxyManager {
     private const val TAG = "LocalProxy"
     private const val KEYSTORE_FILE = "proxy_ca.p12"
-    private const val KEYSTORE_PASSWORD = ""
+    private const val KEYSTORE_PREFS = "spotilol_secure_prefs"
+    private const val KEY_PASSWORD = "keystore_password"
     private const val CA_ALIAS = "spotilol-ca"
     private const val KEYSTORE_TYPE = "PKCS12"
 
@@ -56,25 +59,61 @@ object LocalProxyManager {
     val port: Int get() = serverSocket?.localPort ?: 0
     val isRunning: Boolean get() = serverSocket?.isBound == true && !(serverSocket?.isClosed ?: true)
 
+    private fun getOrCreateKeystorePassword(context: Context): String {
+        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        val prefs = EncryptedSharedPreferences.create(
+            KEYSTORE_PREFS,
+            masterKeyAlias,
+            context,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+        var password = prefs.getString(KEY_PASSWORD, null)
+        if (password == null) {
+            val random = SecureRandom()
+            val bytes = ByteArray(32)
+            random.nextBytes(bytes)
+            password = Base64.encodeToString(bytes, Base64.NO_WRAP)
+            prefs.edit().putString(KEY_PASSWORD, password).apply()
+        }
+        return password
+    }
+
     fun init(context: Context) {
         val ksFile = File(context.filesDir, KEYSTORE_FILE)
+        val password = getOrCreateKeystorePassword(context)
 
         if (!ksFile.exists()) {
             Log.d(TAG, "Generating new CA certificate")
-            generateCA(ksFile)
+            generateCA(ksFile, password)
         } else {
             try {
                 Log.d(TAG, "Loading existing CA certificate")
-                loadCA(ksFile)
+                loadCA(ksFile, password)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to load CA, regenerating", e)
-                ksFile.delete()
-                generateCA(ksFile)
+                try {
+                    Log.d(TAG, "Migrating keystore to new password")
+                    val ks = KeyStore.getInstance(KEYSTORE_TYPE)
+                    ksFile.inputStream().use { ks.load(it, "".toCharArray()) }
+                    val entry = ks.getEntry(CA_ALIAS, KeyStore.PasswordProtection("".toCharArray()))
+                        as KeyStore.PrivateKeyEntry
+                    caKeyPair = KeyPair(entry.certificate.publicKey, entry.privateKey)
+                    caCert = entry.certificate as X509Certificate
+                    val newKs = KeyStore.getInstance(KEYSTORE_TYPE)
+                    newKs.load(null, null)
+                    newKs.setKeyEntry(CA_ALIAS, caKeyPair!!.private, password.toCharArray(), arrayOf(caCert))
+                    ksFile.outputStream().use { newKs.store(it, password.toCharArray()) }
+                    Log.d(TAG, "Keystore migrated to new password")
+                } catch (e2: Exception) {
+                    Log.w(TAG, "Failed to load/migrate CA, regenerating", e2)
+                    ksFile.delete()
+                    generateCA(ksFile, password)
+                }
             }
         }
     }
 
-    private fun generateCA(ksFile: File) {
+    private fun generateCA(ksFile: File, password: String) {
         val kpg = KeyPairGenerator.getInstance("RSA")
         kpg.initialize(2048, SecureRandom())
         caKeyPair = kpg.generateKeyPair()
@@ -102,17 +141,17 @@ object LocalProxyManager {
 
         val ks = KeyStore.getInstance(KEYSTORE_TYPE)
         ks.load(null, null)
-        ks.setKeyEntry(CA_ALIAS, caKeyPair!!.private, KEYSTORE_PASSWORD.toCharArray(), arrayOf(caCert))
-        ksFile.outputStream().use { ks.store(it, KEYSTORE_PASSWORD.toCharArray()) }
+        ks.setKeyEntry(CA_ALIAS, caKeyPair!!.private, password.toCharArray(), arrayOf(caCert))
+        ksFile.outputStream().use { ks.store(it, password.toCharArray()) }
 
         Log.d(TAG, "CA certificate generated and saved")
     }
 
-    private fun loadCA(ksFile: File) {
+    private fun loadCA(ksFile: File, password: String) {
         val ks = KeyStore.getInstance(KEYSTORE_TYPE)
-        ksFile.inputStream().use { ks.load(it, KEYSTORE_PASSWORD.toCharArray()) }
+        ksFile.inputStream().use { ks.load(it, password.toCharArray()) }
 
-        val entry = ks.getEntry(CA_ALIAS, KeyStore.PasswordProtection(KEYSTORE_PASSWORD.toCharArray()))
+        val entry = ks.getEntry(CA_ALIAS, KeyStore.PasswordProtection(password.toCharArray()))
             as KeyStore.PrivateKeyEntry
         caKeyPair = KeyPair(entry.certificate.publicKey, entry.privateKey)
         caCert = entry.certificate as X509Certificate
@@ -237,8 +276,8 @@ object LocalProxyManager {
                     writeHttpMessage(response, clientOut)
 
                     if (statusCode == 100 || statusCode == 101) {
-                        clientSSLSocket!!.soTimeout = 0
-                        upstreamSSLSocket!!.soTimeout = 0
+                        clientSSLSocket.soTimeout = 0
+                        upstreamSSLSocket.soTimeout = 0
                         bidirectionalPipe(clientIn, clientOut, upstreamIn, upstreamOut)
                         return
                     }

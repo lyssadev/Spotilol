@@ -136,6 +136,7 @@ class MediaNotificationService : Service() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun setupMediaSession() {
         mediaSession = MediaSessionCompat(this, "SpotilolSession").apply {
             setFlags(

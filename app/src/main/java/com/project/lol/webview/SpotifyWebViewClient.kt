@@ -57,11 +57,11 @@ class SpotifyWebViewClient(
     }
 
     override fun shouldInterceptRequest(
-        view: WebView?,
-        request: WebResourceRequest?
+        view: WebView,
+        request: WebResourceRequest
     ): WebResourceResponse? {
-        val url = request?.url?.toString() ?: return null
-        val method = request?.method ?: "GET"
+        val url = request.url.toString()
+        val method = request.method
 
         if (isAnalyticsDomain(url)) {
             val headers = mapOf("Access-Control-Allow-Origin" to "*")
@@ -77,7 +77,7 @@ class SpotifyWebViewClient(
                     realConn.connectTimeout = 5000
                     realConn.readTimeout = 5000
 
-                    request?.requestHeaders?.forEach { (key, value) ->
+                    request.requestHeaders.forEach { (key, value) ->
                         realConn.setRequestProperty(key, value)
                     }
 
@@ -88,8 +88,8 @@ class SpotifyWebViewClient(
                         && contentType.equals("audio/mpeg", ignoreCase = true)
                         && !isAudioWhitelisted(url)
                     ) {
-                        view?.post { view?.evaluateJavascript("AndBridge.deferMessage('adblock')", null) }
-                        val silent = view?.context?.assets?.open("silent.mp3") ?: return null
+                        view.post { view.evaluateJavascript("AndBridge.deferMessage('adblock')", null) }
+                        val silent = view.context.assets?.open("silent.mp3") ?: return null
                         return WebResourceResponse("audio/mpeg", null, silent)
                     }
                 } finally {

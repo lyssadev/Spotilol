@@ -11,6 +11,7 @@
 -keep class com.project.lol.ui.CertificateActivity { *; }
 -keep class org.bouncycastle.** { *; }
 -dontwarn org.bouncycastle.**
+-dontwarn javax.annotation.concurrent.GuardedBy
 -keepclassmembers enum * { *; }
 -keepclassmembers class * implements java.io.Serializable { *; }
 -keepclassmembers class * implements android.os.Parcelable {
@@ -18,4 +19,3 @@
 }
 -keepattributes *Annotation*,JavascriptInterface,SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
--useuniqueclassmembernames

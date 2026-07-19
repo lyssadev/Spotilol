@@ -2,7 +2,6 @@ package com.project.lol.webview
 
 import android.os.Handler
 import android.os.Looper
-import android.webkit.ConsoleMessage
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -23,6 +22,7 @@ class SpotifyWebChromeClient : WebChromeClient() {
         }
         val newWebView = WebView(view?.context ?: return false).apply {
             webViewClient = object : WebViewClient() {
+                @Suppress("DEPRECATION")
                 override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                     view?.loadUrl(url ?: return false)
                     return true
@@ -36,6 +36,7 @@ class SpotifyWebChromeClient : WebChromeClient() {
         return true
     }
 
+    @Suppress("DEPRECATION")
     override fun onPermissionRequest(permissionRequest: PermissionRequest?) {
         permissionRequest ?: return
         Handler(Looper.getMainLooper()).post {
@@ -48,10 +49,7 @@ class SpotifyWebChromeClient : WebChromeClient() {
         }
     }
 
-    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-        consoleMessage?.let {
-            android.util.Log.d("SpotifyJS", "${it.message()} [${it.sourceId()}:${it.lineNumber()}]")
-        }
-        return true
+    override fun onConsoleMessage(message: String?, lineNumber: Int, sourceId: String?) {
+        android.util.Log.d("SpotifyJS", "$message [$sourceId:$lineNumber]")
     }
 }

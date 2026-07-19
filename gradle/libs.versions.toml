@@ -9,6 +9,7 @@ composeBom = "2026.06.01"
 activityCompose = "1.10.0"
 lifecycleRuntime = "2.9.0"
 media = "1.7.1"
+securityCrypto = "1.0.0"
 bouncycastle = "1.70"
 
 [libraries]
@@ -19,6 +20,7 @@ androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "w
 androidx-media = { group = "androidx.media", name = "media", version.ref = "media" }
 bouncyprov = { group = "org.bouncycastle", name = "bcprov-jdk15on", version.ref = "bouncycastle" }
 bouncypkix = { group = "org.bouncycastle", name = "bcpkix-jdk15on", version.ref = "bouncycastle" }
+security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 
 # Jetpack Compose
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }

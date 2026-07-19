@@ -11,8 +11,11 @@ android {
         applicationId = "com.project.lol"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.3"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildFeatures {
@@ -53,6 +56,7 @@ dependencies {
     implementation(libs.androidx.media)
     implementation(libs.bouncyprov)
     implementation(libs.bouncypkix)
+    implementation(libs.security.crypto)
 
     // Jetpack Compose
     implementation(platform(libs.compose.bom))
