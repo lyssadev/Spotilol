@@ -34,7 +34,6 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,8 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,12 +56,10 @@ import com.project.lol.bridge.SpotifyBridge
 import com.project.lol.proxy.LocalProxyManager
 import com.project.lol.service.MediaNotificationService
 import com.project.lol.webview.SpotifyWebChromeClient
+import com.project.lol.ui.theme.SpotifyTheme
 import com.project.lol.webview.SpotifyWebViewClient
 import java.lang.ref.WeakReference
 import java.util.concurrent.Executors
-
-private val MonochromeHeader = Color(0xFF000000)
-private val MonochromeText = Color(0xFFFFFFFF)
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
@@ -342,52 +337,3 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun SpotifyTheme(
-    useDynamicColor: Boolean = false,
-    amoled: Boolean = false,
-    content: @Composable () -> Unit
-) {
-    val context = LocalContext.current
-    val baseScheme = when {
-        useDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            androidx.compose.material3.dynamicDarkColorScheme(context)
-        }
-        else -> androidx.compose.material3.darkColorScheme(
-            primary = Color(0xFFE0E0E0),
-            onPrimary = Color(0xFF121212),
-            primaryContainer = Color(0xFF2E2E2E),
-            onPrimaryContainer = Color(0xFFF5F5F5),
-            inversePrimary = Color(0xFF121212),
-            secondary = Color(0xFFCCCCCC),
-            onSecondary = Color(0xFF1A1A1A),
-            secondaryContainer = Color(0xFF262626),
-            onSecondaryContainer = Color(0xFFE0E0E0),
-            tertiary = Color(0xFFB0B0B0),
-            onTertiary = Color(0xFF181818),
-            tertiaryContainer = Color(0xFF202020),
-            onTertiaryContainer = Color(0xFFD6D6D6),
-            outline = Color(0xFF767676),
-            outlineVariant = Color(0xFF444444)
-        )
-    }
-
-    val colorScheme = if (amoled) {
-        baseScheme.copy(
-            background = Color.Black,
-            surface = Color.Black,
-            surfaceVariant = Color(0xFF0F0F0F),
-            surfaceContainer = Color.Black,
-            surfaceContainerLow = Color.Black,
-            surfaceContainerHigh = Color(0xFF141414),
-            surfaceContainerLowest = Color.Black,
-        )
-    } else {
-        baseScheme
-    }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        content = content
-    )
-}
