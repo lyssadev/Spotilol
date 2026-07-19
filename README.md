@@ -17,9 +17,9 @@ runs a local MITM proxy with a custom CA cert so Spotify doesn't clock you're on
 ## Preview
 
 <div align="center">
-  <img src="art/spotilol_ss1.webp" alt="screenshot 1" style="max-width: 250px; width: 100%; height: auto; margin: 4px; border-radius: 12px;" />
-  <img src="art/spotilol_ss2.webp" alt="screenshot 2" style="max-width: 250px; width: 100%; height: auto; margin: 4px; border-radius: 12px;" />
-  <img src="art/spotilol_ss3.webp" alt="screenshot 3" style="max-width: 250px; width: 100%; height: auto; margin: 4px; border-radius: 12px;" />
+  <img src="art/spotilol_ss1.webp" alt="screenshot 1" width="30%" style="max-width: 250px; margin: 4px; border-radius: 12px;" />
+  <img src="art/spotilol_ss2.webp" alt="screenshot 2" width="30%" style="max-width: 250px; margin: 4px; border-radius: 12px;" />
+  <img src="art/spotilol_ss3.webp" alt="screenshot 3" width="30%" style="max-width: 250px; margin: 4px; border-radius: 12px;" />
 </div>
 
 ---
