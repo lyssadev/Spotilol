@@ -1,0 +1,37 @@
+name: Build and Release APK
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build APK and Upload
+    # This is the virtual machine OS compiling the code, standard for Android builds
+    runs-on: ubuntu-latest 
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17' # Matches your sourceCompatibility in build.gradle.kts
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for Gradle
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        # Builds a debug APK since the release signing config is disabled
+        run: ./gradlew assembleDebug 
+
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Points to the folder where the debug APK is generated
+          files: app/build/outputs/apk/debug/*.apk 
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
