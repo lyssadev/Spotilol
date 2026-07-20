@@ -38,7 +38,6 @@ import java.util.concurrent.Executors
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLParameters
 import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
@@ -52,9 +51,9 @@ object LocalProxyManager {
     private const val KEYSTORE_TYPE = "PKCS12"
 
     private var serverSocket: ServerSocket? = null
-    private var caKeyPair: KeyPair? = null
-    private var caCert: X509Certificate? = null
-    private val threadPool = Executors.newCachedThreadPool()
+    @Volatile private var caKeyPair: KeyPair? = null
+    @Volatile private var caCert: X509Certificate? = null
+    private val threadPool = Executors.newFixedThreadPool(32)
 
     private val sslContextCache = Collections.synchronizedMap(HashMap<String, SSLContext>())
 
@@ -274,17 +273,21 @@ object LocalProxyManager {
                 bidirectionalPipe(clientIn, clientOut, upstreamIn, upstreamOut)
             } else {
                 while (true) {
-                    val request = readHttpMessage(clientIn, null) ?: break
-                    val requestMethod = extractMethod(request)
+                    val reqHead = readHttpHead(clientIn, null) ?: break
+                    val requestMethod = extractMethod(reqHead)
 
-                    modifyRequestHeaders(request)
+                    modifyRequestHeaders(reqHead)
 
-                    writeHttpMessage(request, upstreamOut)
+                    writeHead(reqHead, upstreamOut)
 
-                    val response = readHttpMessage(upstreamIn, requestMethod) ?: break
+                    pipeBody(clientIn, upstreamOut, reqHead)
 
-                    val statusCode = extractStatusCode(response)
-                    writeHttpMessage(response, clientOut)
+                    val respHead = readHttpHead(upstreamIn, requestMethod) ?: break
+
+                    val statusCode = extractStatusCode(respHead)
+                    writeHead(respHead, clientOut)
+
+                    pipeBody(upstreamIn, clientOut, respHead)
 
                     if (statusCode == 100 || statusCode == 101) {
                         clientSSLSocket.soTimeout = 0
@@ -293,8 +296,8 @@ object LocalProxyManager {
                         return
                     }
 
-                    val reqConnection = getHeaderValue(request, "Connection")
-                    val respConnection = getHeaderValue(response, "Connection")
+                    val reqConnection = getHeaderValue(reqHead, "Connection")
+                    val respConnection = getHeaderValue(respHead, "Connection")
 
                     val keepAlive = !reqConnection.equals("close", ignoreCase = true) &&
                         !respConnection.equals("close", ignoreCase = true)
@@ -310,7 +313,15 @@ object LocalProxyManager {
         }
     }
 
-    private fun readHttpMessage(input: InputStream, methodHint: String?): HttpMessage? {
+    private data class HttpHead(
+        val statusLine: String,
+        val headers: MutableList<Pair<String, String>>,
+        val contentLength: Long,
+        val isChunked: Boolean,
+        val noBody: Boolean
+    )
+
+    private fun readHttpHead(input: InputStream, methodHint: String?): HttpHead? {
         val statusLine = readLine(input) ?: return null
         if (statusLine.isEmpty()) return null
 
@@ -333,18 +344,11 @@ object LocalProxyManager {
             val code = extractStatusCodeFromLine(statusLine)
             noBody = code / 100 == 1 || code == 204 || code == 304 ||
                 methodHint.equals("HEAD", ignoreCase = true)
-            if (!noBody) {
-                for ((k, v) in headers) {
-                    if (k.equals("Content-Length", ignoreCase = true)) {
-                        contentLength = v.trim().toLongOrNull() ?: -1L
-                    }
-                    if (k.equals("Transfer-Encoding", ignoreCase = true) &&
-                        v.equals("chunked", ignoreCase = true)) {
-                        isChunked = true
-                    }
-                }
-            }
         } else {
+            noBody = false
+        }
+        
+        if (!noBody) {
             for ((k, v) in headers) {
                 if (k.equals("Content-Length", ignoreCase = true)) {
                     contentLength = v.trim().toLongOrNull() ?: -1L
@@ -354,73 +358,69 @@ object LocalProxyManager {
                     isChunked = true
                 }
             }
-            noBody = false
         }
 
-        val body: ByteArray = when {
-            isChunked -> {
-                readRawChunkedBody(input)
-            }
-            contentLength > 0 -> readExactBytes(input, contentLength.toInt())
-            else -> ByteArray(0)
-        }
-
-        return HttpMessage(statusLine, headers, body)
+        return HttpHead(statusLine, headers, contentLength, isChunked, noBody)
     }
-
-    private fun readRawChunkedBody(input: InputStream): ByteArray {
-        val output = ByteArrayOutputStream()
-        while (true) {
-            val sizeLine = readLine(input) ?: break
-            if (sizeLine.isBlank()) continue
-            val rawChunkHeader = sizeLine.trimEnd('\r')
-            output.write((rawChunkHeader + "\r\n").toByteArray(Charsets.ISO_8859_1))
-            val chunkSize = rawChunkHeader.split(";")[0].trim().toLongOrNull(16) ?: break
-            if (chunkSize == 0L) {
-                val trailer = readLine(input) ?: break
-                output.write((trailer + "\r\n").toByteArray(Charsets.ISO_8859_1))
-                break
-            }
-            val chunk = readExactBytes(input, chunkSize.toInt())
-            output.write(chunk)
-            val crlf = readLine(input) ?: break
-            output.write((crlf + "\r\n").toByteArray(Charsets.ISO_8859_1))
-        }
-        return output.toByteArray()
-    }
-
-    private fun readExactBytes(input: InputStream, count: Int): ByteArray {
-        val buf = ByteArray(count)
-        var off = 0
-        while (off < count) {
-            val n = input.read(buf, off, count - off)
-            if (n == -1) throw java.io.EOFException("Unexpected end of stream")
-            off += n
-        }
-        return buf
-    }
-
-    private fun writeHttpMessage(msg: HttpMessage, output: OutputStream) {
+    private fun writeHead(head: HttpHead, output: OutputStream) {
         val sb = StringBuilder()
-        sb.append(msg.statusLine).append("\r\n")
-        for ((k, v) in msg.headers) {
-            sb.append(k).append(": ").append(v).append("\r\n")
-        }
+        sb.append(head.statusLine).append("\r\n")
+        for ((k, v) in head.headers) sb.append(k).append(": ").append(v).append("\r\n")
         sb.append("\r\n")
         output.write(sb.toString().toByteArray(Charsets.ISO_8859_1))
-        if (msg.body.isNotEmpty()) {
-            output.write(msg.body)
+        output.flush()
+    }
+
+    private fun pipeBody(input: InputStream, output: OutputStream, head: HttpHead) {
+        when {
+            head.noBody -> {}
+            head.isChunked -> pipeChunkedBody(input, output)
+            head.contentLength > 0 -> pipeExactBytes(input, output, head.contentLength)
+            else -> {}
+        }
+    }
+
+    private fun pipeExactBytes(input: InputStream, output: OutputStream, count: Long) {
+        val buf = ByteArray(8192)
+        var remaining = count
+        while (remaining > 0) {
+            val n = input.read(buf, 0, minOf(buf.size.toLong(), remaining).toInt())
+            if (n == -1) throw java.io.EOFException("Unexpected end of stream")
+            output.write(buf, 0, n)
+            remaining -= n
         }
         output.flush()
     }
 
-    private fun extractMethod(msg: HttpMessage): String {
-        val parts = msg.statusLine.split(" ")
+    private fun pipeChunkedBody(input: InputStream, output: OutputStream) {
+        while (true) {
+            val sizeLine = readLine(input) ?: break
+            if (sizeLine.isBlank()) continue
+            
+            output.write((sizeLine + "\r\n").toByteArray(Charsets.ISO_8859_1))
+            val chunkSize = sizeLine.split(";")[0].trim().toLongOrNull(16) ?: break
+            
+            if (chunkSize == 0L) {
+                val trailer = readLine(input) ?: break
+                output.write((trailer + "\r\n").toByteArray(Charsets.ISO_8859_1))
+                output.flush()
+                break
+            }
+            
+            pipeExactBytes(input, output, chunkSize)
+            val crlf = readLine(input) ?: break
+            output.write((crlf + "\r\n").toByteArray(Charsets.ISO_8859_1))
+        }
+        output.flush()
+    }
+
+    private fun extractMethod(head: HttpHead): String {
+        val parts = head.statusLine.split(" ")
         return if (parts.isNotEmpty() && !parts[0].startsWith("HTTP")) parts[0] else ""
     }
 
-    private fun extractStatusCode(msg: HttpMessage): Int {
-        return extractStatusCodeFromLine(msg.statusLine)
+    private fun extractStatusCode(head: HttpHead): Int {
+        return extractStatusCodeFromLine(head.statusLine)
     }
 
     private fun extractStatusCodeFromLine(line: String): Int {
@@ -429,18 +429,12 @@ object LocalProxyManager {
         } catch (_: Exception) { -1 }
     }
 
-    private fun getHeaderValue(msg: HttpMessage, name: String): String? {
-        for ((k, v) in msg.headers) {
+    private fun getHeaderValue(head: HttpHead, name: String): String? {
+        for ((k, v) in head.headers) {
             if (k.equals(name, ignoreCase = true)) return v
         }
         return null
     }
-
-    private data class HttpMessage(
-        val statusLine: String,
-        val headers: MutableList<Pair<String, String>>,
-        val body: ByteArray
-    )
 
     private fun getOrCreateSSLContext(hostname: String): SSLContext {
         sslContextCache[hostname]?.let { return it }
@@ -506,7 +500,7 @@ object LocalProxyManager {
         }
     }
 
-    private fun modifyRequestHeaders(msg: HttpMessage) {
+    private fun modifyRequestHeaders(msg: HttpHead) {
         msg.headers.removeAll { it.first.equals("X-Requested-With", ignoreCase = true) }
 
         msg.headers.removeAll { it.first.equals("sec-ch-ua", ignoreCase = true) }
