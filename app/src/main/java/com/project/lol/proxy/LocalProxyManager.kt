@@ -218,7 +218,7 @@ object LocalProxyManager {
             try { sock.close() } catch (_: Exception) {}
             return
         }
-        val queue = upstreamPool.getOrPut(poolKey(host, port)) { ConcurrentLinkedQueue() }
+        val queue = upstreamPool.computeIfAbsent(poolKey(host, port)) { ConcurrentLinkedQueue() }
         if (queue.size >= MAX_IDLE_UPSTREAM_PER_HOST) {
             try { sock.close() } catch (_: Exception) {}
             return
@@ -299,21 +299,22 @@ object LocalProxyManager {
 
             val sslContext = getOrCreateSSLContext(host)
 
-            clientSSLSocket = sslContext.socketFactory.createSocket(
+            val clientSocket = sslContext.socketFactory.createSocket(
                 client, host, client.port, true
             ) as SSLSocket
-            clientSSLSocket.useClientMode = false
+            clientSocket.useClientMode = false
+            clientSSLSocket = clientSocket
 
             if (Build.VERSION.SDK_INT >= 29) {
-                val params = clientSSLSocket.sslParameters
+                val params = clientSocket.sslParameters
                 params.applicationProtocols = arrayOf("http/1.1")
-                clientSSLSocket.sslParameters = params
+                clientSocket.sslParameters = params
             }
 
-            clientSSLSocket.startHandshake()
+            clientSocket.startHandshake()
 
             val negotiatedProtocol = if (Build.VERSION.SDK_INT >= 29) {
-                clientSSLSocket.applicationProtocol
+                clientSocket.applicationProtocol
             } else null
 
             // We only ever offer "http/1.1" to the client above, so this is always false currently.
@@ -321,18 +322,20 @@ object LocalProxyManager {
             val useHttp2 = negotiatedProtocol == "h2"
             Log.d(TAG, "Protocol for $host: ${negotiatedProtocol ?: "none"}")
 
-            upstreamSSLSocket = borrowUpstreamSocket(host, targetPort)
-            if (upstreamSSLSocket != null) {
+            val borrowed = borrowUpstreamSocket(host, targetPort)
+            var upstream: SSLSocket = if (borrowed != null) {
                 fromPool = true
                 Log.d(TAG, "Reusing pooled upstream connection for $host")
+                borrowed
             } else {
-                upstreamSSLSocket = openUpstreamSocket(host, targetPort, useHttp2)
+                openUpstreamSocket(host, targetPort, useHttp2)
             }
+            upstreamSSLSocket = upstream
 
-            val clientIn = clientSSLSocket.inputStream
-            val clientOut = clientSSLSocket.outputStream
-            var upstreamIn = upstreamSSLSocket.inputStream
-            var upstreamOut = upstreamSSLSocket.outputStream
+            val clientIn = clientSocket.inputStream
+            val clientOut = clientSocket.outputStream
+            var upstreamIn = upstream.inputStream
+            var upstreamOut = upstream.outputStream
 
             if (useHttp2) {
                 reuseUpstream = false
@@ -350,11 +353,12 @@ object LocalProxyManager {
                         //Retry once on a fresh socket instead of failing the whole tunnel;
                         if (!fromPool) throw e
                         Log.d(TAG, "Pooled upstream for $host was stale, reconnecting")
-                        try { upstreamSSLSocket.close() } catch (_: Exception) {}
-                        upstreamSSLSocket = openUpstreamSocket(host, targetPort, useHttp2)
+                        try { upstream.close() } catch (_: Exception) {}
+                        upstream = openUpstreamSocket(host, targetPort, useHttp2)
+                        upstreamSSLSocket = upstream
                         fromPool = false
-                        upstreamIn = upstreamSSLSocket.inputStream
-                        upstreamOut = upstreamSSLSocket.outputStream
+                        upstreamIn = upstream.inputStream
+                        upstreamOut = upstream.outputStream
                         writeHead(reqHead, upstreamOut)
                     }
                     pipeBody(clientIn, upstreamOut, reqHead)  // outside the retry to avoid truncated body
@@ -371,8 +375,8 @@ object LocalProxyManager {
                     pipeBody(upstreamIn, clientOut, respHead)
 
                     if (statusCode == 100 || statusCode == 101) {
-                        clientSSLSocket.soTimeout = 0
-                        upstreamSSLSocket.soTimeout = 0
+                        clientSocket.soTimeout = 0
+                        upstream.soTimeout = 0
                         reuseUpstream = false
                         bidirectionalPipe(clientIn, clientOut, upstreamIn, upstreamOut)
                         return
