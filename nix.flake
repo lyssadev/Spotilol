@@ -1,0 +1,45 @@
+{
+  description = "spotilol dev shell";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          config = {
+            allowUnfree = true;
+            android_sdk.accept_license = true;
+          };
+        };
+
+        androidComposition = pkgs.androidenv.composeAndroidPackages {
+          cmdLineToolsVersion   = "13.0";
+          platformToolsVersion  = "36.0.0";
+          buildToolsVersions    = [ "36.0.0" "37.0.0" ];
+          platformVersions      = [ "37" "36" ]; # compileSdk 37, targetSdk 36
+          includeNDK             = false;
+          includeEmulator        = false;
+          includeSystemImages    = false;
+        };
+        androidSdk = androidComposition.androidsdk;
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          buildInputs = [ pkgs.jdk21 androidSdk ];
+
+          JAVA_HOME       = "${pkgs.jdk21}";
+          ANDROID_HOME    = "${androidSdk}/libexec/android-sdk";
+          ANDROID_SDK_ROOT = "${androidSdk}/libexec/android-sdk";
+
+          shellHook = ''
+            export PATH="$ANDROID_HOME/platform-tools:$PATH"
+            fi
+          '';
+        };
+      });
+}
