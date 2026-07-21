@@ -566,6 +566,9 @@ class MainActivity : ComponentActivity() {
                     WebViewCompat.getWebViewRenderProcess(it)?.terminate()
                 } catch (_: Exception) {}
             }
+            // Must detach from its parent before destroy()
+            // Otherwise the WebView and its renderer will be left in a bad state;
+            (it.parent as? ViewGroup)?.removeView(it)
             it.removeAllViews()
             it.destroy()
         }
@@ -655,6 +658,7 @@ class MainActivity : ComponentActivity() {
             it.clearCache(true)
             it.clearFormData()
             it.removeJavascriptInterface("AndBridge")
+            (it.parent as? ViewGroup)?.removeView(it)
             it.removeAllViews()
             it.destroy()
         }
