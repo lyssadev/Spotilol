@@ -69,7 +69,6 @@ class SpotifyWebViewClient(
         request: WebResourceRequest
     ): WebResourceResponse? {
         val url = request.url.toString()
-        val method = request.method
 
         if (isAnalyticsDomain(url)) {
             val headers = mapOf("Access-Control-Allow-Origin" to "*")
@@ -77,37 +76,49 @@ class SpotifyWebViewClient(
                 ByteArrayInputStream(ByteArray(0)))
         }
 
-        if (isKnownAudioCdn(url)) {
+        // These hosts only ever serve ads, so there's nothing to check - skip the network
+        // probe entirely and silence immediately.
+        if (isAlwaysAdDomain(url)) {
+            return silentAudioResponse(view)
+        }
+
+        // These CDNs serve both real tracks and ads from the same path pattern
+        // A HEAD probe reads Content-Type without transferring the actual audio body a second time
+        // Whitelisted URLs skip the probe altogether since we already know they're not ads.
+        if (isAmbiguousAudioCdn(url) && !isAudioWhitelisted(url)) {
             try {
-                val realConn = URL(url).openConnection() as HttpURLConnection
+                val probeConn = URL(url).openConnection() as HttpURLConnection
                 try {
-                    realConn.requestMethod = method
-                    realConn.connectTimeout = 5000
-                    realConn.readTimeout = 5000
+                    probeConn.requestMethod = "HEAD"
+                    probeConn.connectTimeout = 5000
+                    probeConn.readTimeout = 5000
 
                     request.requestHeaders.forEach { (key, value) ->
-                        realConn.setRequestProperty(key, value)
+                        probeConn.setRequestProperty(key, value)
                     }
 
-                    realConn.connect()
-                    val contentType = realConn.contentType
+                    probeConn.connect()
+                    val contentType = probeConn.contentType
 
-                    if (contentType != null
-                        && contentType.equals("audio/mpeg", ignoreCase = true)
-                        && !isAudioWhitelisted(url)
-                    ) {
-                        view.post { view.evaluateJavascript("AndBridge.deferMessage('adblock')", null) }
-                        val silent = view.context.assets?.open("silent.mp3") ?: return null
-                        return WebResourceResponse("audio/mpeg", null, silent)
+                    if (contentType != null && contentType.equals("audio/mpeg", ignoreCase = true)) {
+                        return silentAudioResponse(view)
                     }
                 } finally {
-                    realConn.disconnect()
+                    probeConn.disconnect()
                 }
             } catch (_: Exception) {
+                // Fail open: if the probe itself fails, let the real request through rather
+                // than risk blocking legitimate audio.
             }
         }
 
         return null
+    }
+
+    private fun silentAudioResponse(view: WebView): WebResourceResponse? {
+        val silent = view.context.assets?.open("silent.mp3") ?: return null
+        view.post { view.evaluateJavascript("AndBridge.deferMessage('adblock')", null) }
+        return WebResourceResponse("audio/mpeg", null, silent)
     }
 
     private fun injectPlayerControl(view: WebView) {
@@ -855,15 +866,21 @@ class SpotifyWebViewClient(
                     url.contains("gew4-spclient")
         }
 
-        private fun isKnownAudioCdn(url: String): Boolean {
-            return url.contains("akamaized.net/audio/") ||
-                    url.contains("scdn.co/audio/") ||
-                    url.contains("scdn.co/mp3-ad/") ||
-                    url.contains("spotifycdn.com/audio/") ||
-                    url.contains("amillionads.com") ||
+        // Ad-network hosts - never serve real Spotify audio, so no need to check first.
+        private fun isAlwaysAdDomain(url: String): Boolean {
+            return url.contains("amillionads.com") ||
                     url.contains("2mdn.net") ||
                     url.contains("adxcel.com") ||
                     url.contains("adstudio-assets.scdn.co")
+        }
+
+        // Real Spotify CDNs that serve both tracks and ads from the same path pattern -
+        // still needs a content-type check to tell them apart.
+        private fun isAmbiguousAudioCdn(url: String): Boolean {
+            return url.contains("akamaized.net/audio/") ||
+                    url.contains("scdn.co/audio/") ||
+                    url.contains("scdn.co/mp3-ad/") ||
+                    url.contains("spotifycdn.com/audio/")
         }
 
         fun buildCustomCssJs(css: String): String {
