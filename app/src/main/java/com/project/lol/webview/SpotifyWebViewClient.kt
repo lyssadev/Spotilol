@@ -643,6 +643,14 @@ class SpotifyWebViewClient(
                         sr.classList.add('fuckd');
                         sr.addEventListener('keydown',function(e){if(e.key==='Enter'){closeNowPlay();}});
                     }
+                    var sdd=document.getElementById('search-dropdown');
+                    if(sdd && !sdd.classList.contains('fuckd')){
+                        sdd.classList.add('fuckd');
+                        sdd.addEventListener('click',function(e){
+                            var t=e.target.closest('a[href*="/track/"]');
+                            if(t) closeNowPlay();
+                        },true);
+                    }
                     var ub=document.querySelector('button[data-testid=user-widget-link]:not(.fuckd)');
                     if(ub){ub.classList.add('fuckd');ub.addEventListener('click',function(){closeNowPlay();});}
                 },5000);
