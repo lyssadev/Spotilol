@@ -9,8 +9,6 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.regex.Pattern
 
 class SpotifyWebViewClient(
@@ -77,34 +75,10 @@ class SpotifyWebViewClient(
                 ByteArrayInputStream(ByteArray(0)))
         }
 
-        if (isKnownAudioCdn(url)) {
-            try {
-                val realConn = URL(url).openConnection() as HttpURLConnection
-                try {
-                    realConn.requestMethod = method
-                    realConn.connectTimeout = 5000
-                    realConn.readTimeout = 5000
-
-                    request.requestHeaders.forEach { (key, value) ->
-                        realConn.setRequestProperty(key, value)
-                    }
-
-                    realConn.connect()
-                    val contentType = realConn.contentType
-
-                    if (contentType != null
-                        && contentType.equals("audio/mpeg", ignoreCase = true)
-                        && !isAudioWhitelisted(url)
-                    ) {
-                        view.post { view.evaluateJavascript("AndBridge.deferMessage('adblock')", null) }
-                        val silent = view.context.assets?.open("silent.mp3") ?: return null
-                        return WebResourceResponse("audio/mpeg", null, silent)
-                    }
-                } finally {
-                    realConn.disconnect()
-                }
-            } catch (_: Exception) {
-            }
+        if (isAdCdn(url)) {
+            view.post { view.evaluateJavascript("AndBridge.deferMessage('adblock')", null) }
+            val silent = view.context.assets?.open("silent.mp3") ?: return null
+            return WebResourceResponse("audio/mpeg", null, silent)
         }
 
         return null
@@ -855,20 +829,21 @@ class SpotifyWebViewClient(
                     url.contains("sentry.io")
         }
 
-        private fun isAudioWhitelisted(url: String): Boolean {
-            return url.contains("podz-content") ||
-                    url.contains("gew4-spclient")
-        }
-
-        private fun isKnownAudioCdn(url: String): Boolean {
-            return url.contains("akamaized.net/audio/") ||
-                    url.contains("scdn.co/audio/") ||
-                    url.contains("scdn.co/mp3-ad/") ||
-                    url.contains("spotifycdn.com/audio/") ||
+        private fun isAdCdn(url: String): Boolean {
+            return url.contains("scdn.co/mp3-ad/") ||
+                    url.contains("mp3ad.scdn.co") ||
                     url.contains("amillionads.com") ||
                     url.contains("2mdn.net") ||
                     url.contains("adxcel.com") ||
-                    url.contains("adstudio-assets.scdn.co")
+                    url.contains("adstudio-assets.scdn.co") ||
+                    url.contains("audio-ads.spotify.com") ||
+                    url.contains("ads-akp.spotify.com") ||
+                    url.contains("ads-fa.spotify.com") ||
+                    url.contains("adeventtracker.spotify.com") ||
+                    url.contains("pixel.spotify.com") ||
+                    url.contains("pixel-static.spotify.com") ||
+                    url.contains("adstudio.spotify.com") ||
+                    url.contains("ads.spotify.com")
         }
 
         fun buildCustomCssJs(css: String): String {
