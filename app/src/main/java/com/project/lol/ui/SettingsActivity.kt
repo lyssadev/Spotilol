@@ -213,7 +213,6 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Player Settings Section
             SettingSectionCard(
                 title = "PLAYER",
                 icon = Icons.Default.PlayCircle
@@ -271,7 +270,6 @@ fun SettingsScreen(
                 )
             }
 
-            // Appearance Section
             SettingSectionCard(
                 title = "APPEARANCE",
                 icon = Icons.Default.Palette
@@ -326,7 +324,6 @@ fun SettingsScreen(
                 )
             }
 
-            // Security Section
             SettingSectionCard(
                 title = "SECURITY & NETWORK",
                 icon = Icons.Default.Shield
@@ -343,7 +340,6 @@ fun SettingsScreen(
                 )
             }
 
-            // System Section
             SettingSectionCard(
                 title = "SYSTEM",
                 icon = Icons.Default.PowerSettingsNew
@@ -379,8 +375,9 @@ fun SettingsScreen(
                 )
             }
 
-            // Updates Section
             val updateContext = LocalContext.current
+            val uc = remember { UpdateChecker(updateContext) }
+            var hasUpdate by remember { mutableStateOf(uc.hasUpdateAvailable()) }
             SettingSectionCard(
                 title = "UPDATES",
                 icon = Icons.Default.SystemUpdate
@@ -389,11 +386,14 @@ fun SettingsScreen(
                     title = "Check for Updates",
                     subtitle = "Manually check for new releases",
                     icon = Icons.Default.SystemUpdate,
-                    onClick = { UpdateChecker(updateContext).manualCheck() }
+                    showBadge = hasUpdate,
+                    onClick = {
+                        uc.clearUpdateAvailable()
+                        hasUpdate = false
+                    }
                 )
             }
 
-            // About Section
             val context = LocalContext.current
             val pkg = remember { WebViewCompat.getCurrentWebViewPackage(context) }
             val packageInfo = remember {
@@ -573,7 +573,8 @@ fun SettingTile(
     icon: ImageVector? = null,
     painter: Painter? = null,
     onClick: () -> Unit,
-    isDestructive: Boolean = false
+    isDestructive: Boolean = false,
+    showBadge: Boolean = false
 ) {
     Row(
         modifier = Modifier
@@ -609,6 +610,14 @@ fun SettingTile(
                     contentDescription = null,
                     tint = tint,
                     modifier = Modifier.size(20.dp)
+                )
+            }
+            if (showBadge) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .align(Alignment.TopEnd)
+                        .background(Color.Red, CircleShape)
                 )
             }
         }

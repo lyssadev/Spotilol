@@ -40,7 +40,6 @@ class SpotifyWebViewClient(
 
         injectPlayerControl(view)
 
-        // SSR-based logout detection: si isAnonymous=true, redirige al login al instante
         view.evaluateJavascript(LOGOUT_CHECK_JS) { result ->
             if (result == "\"out\"") {
                 view.context.getSharedPreferences("spotilol_prefs", 0)
