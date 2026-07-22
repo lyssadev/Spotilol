@@ -307,7 +307,7 @@ class MainActivity : ComponentActivity() {
                                         }
 
                                         if (loggedIn) {
-                                            loadUrl("https://open.spotify.com/")
+                                            loadUrl("https://open.spotify.com/collection/tracks")
                                         } else {
                                             loadUrl("https://accounts.spotify.com/login")
                                         }
