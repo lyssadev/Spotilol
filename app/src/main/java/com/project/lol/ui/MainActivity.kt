@@ -128,6 +128,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // After an OOM kill, Android can resume directly at MainActivity
+        // skipping CertificateActivity. Redirect there so the proxy starts.
+        if (!LocalProxyManager.isRunning) {
+            startActivity(Intent(this, CertificateActivity::class.java))
+            finish()
+            return
+        }
+
         if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
             WebView.setWebContentsDebuggingEnabled(true)
         }
