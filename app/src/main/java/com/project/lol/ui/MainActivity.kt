@@ -309,7 +309,7 @@ class MainActivity : ComponentActivity() {
                                         }
 
                                         if (loggedIn) {
-                                            loadUrl("https://open.spotify.com/collection/tracks")
+                                            loadUrl("https://open.spotify.com/")
                                         } else {
                                             loadUrl("https://accounts.spotify.com/login")
                                         }
