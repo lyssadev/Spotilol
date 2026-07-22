@@ -612,6 +612,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        webView?.evaluateJavascript("""
+            try {
+                document.querySelectorAll('video').forEach(function(v) {
+                    if(v.muted || v.hasAttribute('loop') || v.style.objectFit === 'cover') {
+                        v.pause();
+                        v.removeAttribute('src');
+                        v.load();
+                    }
+                });
+            } catch(e) {}
+        """.trimIndent(), null)
+    }
+
     override fun onResume() {
         super.onResume()
         val prefs = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
