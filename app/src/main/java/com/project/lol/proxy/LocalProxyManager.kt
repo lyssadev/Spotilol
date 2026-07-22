@@ -55,6 +55,7 @@ object LocalProxyManager {
     private var serverSocket: ServerSocket? = null
     @Volatile private var caKeyPair: KeyPair? = null
     @Volatile private var caCert: X509Certificate? = null
+	@Volatile private var leafKeyPair: KeyPair? = null
     private val threadPool = Executors.newFixedThreadPool(32)
 
     private val sslContextCache = Collections.synchronizedMap(HashMap<String, SSLContext>())
@@ -610,9 +611,14 @@ object LocalProxyManager {
     }
 
     private fun generateDomainCert(domain: String): Pair<X509Certificate, KeyPair> {
-        val kpg = KeyPairGenerator.getInstance("RSA")
-        kpg.initialize(2048, SecureRandom())
-        val domainKeyPair = kpg.generateKeyPair()
+        // Reuse a single keypair for all leaf certificates to eliminate RSA overhead.
+        // Thread-safe as only called within the synchronized block of getOrCreateSSLContext.
+        if (leafKeyPair == null) {
+            val kpg = KeyPairGenerator.getInstance("RSA")
+            kpg.initialize(2048, SecureRandom())
+            leafKeyPair = kpg.generateKeyPair()
+        }
+        val domainKeyPair = leafKeyPair!!
 
         val issuer = X500Name("CN=Spotilol Proxy CA, O=Spotilol")
         val subject = X500Name("CN=$domain")
