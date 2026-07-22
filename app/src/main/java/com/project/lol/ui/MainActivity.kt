@@ -84,6 +84,9 @@ import com.project.lol.ui.theme.SpotifyTheme
 import com.project.lol.update.UpdateChecker
 import com.project.lol.webview.SpotifyWebChromeClient
 import com.project.lol.webview.SpotifyWebViewClient
+import com.project.lol.webview.helpers.buildAmoledJs
+import com.project.lol.webview.helpers.buildCustomCssJs
+import com.project.lol.webview.injections.LogoutCheck
 import java.lang.ref.WeakReference
 import java.util.concurrent.Executors
 
@@ -649,13 +652,13 @@ class MainActivity : ComponentActivity() {
         webView?.let { view ->
             val js = buildString {
                 append("window.closeNpPref=$closeNowPlay;\n")
-                append(SpotifyWebViewClient.buildAmoledJs(amoledEnabled))
+                append(buildAmoledJs(amoledEnabled))
                 append("\n")
-                append(SpotifyWebViewClient.buildCustomCssJs(customCss))
+                append(buildCustomCssJs(customCss))
             }
             view.evaluateJavascript(js, null)
 
-            view.evaluateJavascript(SpotifyWebViewClient.LOGOUT_CHECK_JS) { result ->
+            view.evaluateJavascript(LogoutCheck.CONTENT) { result ->
                 if (result == "\"out\"") {
                     prefs.edit().putBoolean("LoggedIn", false).apply()
                     view.loadUrl("https://accounts.spotify.com/login")
