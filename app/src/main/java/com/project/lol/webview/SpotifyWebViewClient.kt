@@ -827,7 +827,11 @@ class SpotifyWebViewClient(
             return url.contains("doubleclick.net") ||
                     url.contains("googlesyndication.com") ||
                     url.contains("fastly-insights.com") ||
-                    url.contains("sentry.io")
+                    url.contains("sentry.io") ||
+                    url.contains("t.6sc.co") ||
+                    url.contains("tracker.samplicio.us") ||
+                    url.contains("adsrvr.org") ||
+                    url.contains("aet.spotify.com")
         }
 
         private fun matchAdCdn(url: String): String? {
