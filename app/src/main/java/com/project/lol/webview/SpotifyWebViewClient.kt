@@ -15,9 +15,15 @@ class SpotifyWebViewClient(
     private val onLoginRequired: () -> Unit
 ) : WebViewClient() {
 
+    private var currentWebView: WebView? = null
+    private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
+
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
         if (view == null || url == null) return
+
+        currentWebView = view
+        registerPrefsListener(view)
 
         if (url.startsWith("https://www.facebook.com/privacy/consent/gdp/")) {
             onPageFinishedClean(view, FB_GDPR_BYPASS)
@@ -118,6 +124,48 @@ class SpotifyWebViewClient(
             view.evaluateJavascript(cleanJs + "\n(function(){var s=document.createElement('style');s.textContent='aside[data-testid=\"now-playing-bar\"]{display:flex!important}';document.head.appendChild(s);})();", null)
         } else {
             view.evaluateJavascript(cleanJs, null)
+        }
+    }
+
+    private fun registerPrefsListener(view: WebView) {
+        val prefs = view.context.getSharedPreferences("spotilol_prefs", 0)
+        prefsListener?.let { prefs.unregisterOnSharedPreferenceChangeListener(it) }
+        prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "PlayerMode") {
+                val wv = currentWebView ?: return@OnSharedPreferenceChangeListener
+                val mode = prefs.getString("PlayerMode", "spotilol") ?: "spotilol"
+                switchPlayerMode(wv, mode)
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
+    private fun switchPlayerMode(view: WebView, mode: String) {
+        if (mode == "original") {
+            val js = """
+                (function(){
+                    var pl=document.getElementById('spotilolPlayerControls');
+                    if(pl) pl.style.display='none';
+                    var s=document.createElement('style');
+                    s.id='spl-np-show';
+                    s.textContent='aside[data-testid="now-playing-bar"]{display:flex!important}';
+                    document.head.appendChild(s);
+                })();
+            """.trimIndent()
+            view.evaluateJavascript(js, null)
+        } else {
+            val js = """
+                (function(){
+                    var s=document.getElementById('spl-np-show');
+                    if(s) s.remove();
+                    var npb=document.querySelector('aside[data-testid="now-playing-bar"]');
+                    if(npb) npb.style.display='none';
+                    var pl=document.getElementById('spotilolPlayerControls');
+                    if(pl){pl.style.display='flex';}
+                    else if(typeof initSpotilolPlayer==='function'){initSpotilolPlayer();}
+                })();
+            """.trimIndent()
+            view.evaluateJavascript(js, null)
         }
     }
 
