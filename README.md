@@ -30,7 +30,7 @@
   a lil Android app that wraps Spotify's web player with built-in adblocking.
 </p>
 
-it's a fork of [Spotifuck](https://github.com/deviato/Spotifuck) by **deviato**, ported from smali to clean Kotlin. all free, all open-source.
+it's a fork of **Spotifuck** by **deviato**, ported from smali to clean Kotlin. all free, all open-source.
 
 runs a local MITM proxy with a custom CA cert so Spotify doesn't clock you're on a WebView. that's the magic trick. everything else passes through untouched.
 
