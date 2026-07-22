@@ -138,6 +138,14 @@ class MediaNotificationService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+            coverBitmap = null
+            lastCoverUrl = ""
+        }
+    }
+
     override fun onDestroy() {
         releaseWakeLock()
         instance = null
