@@ -24,7 +24,7 @@
         android:usesCleartextTraffic="false">
 
         <activity
-            android:name=".ui.CertificateActivity"
+            android:name=".ui.SplashActivity"
             android:exported="true"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.Spotilol">

@@ -132,9 +132,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // After an OOM kill, Android can resume directly at MainActivity
-        // skipping CertificateActivity. Redirect there so the proxy starts.
         if (!LocalProxyManager.isRunning) {
-            startActivity(Intent(this, CertificateActivity::class.java))
+            startActivity(Intent(this, SplashActivity::class.java))
             finish()
             return
         }
@@ -384,6 +383,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+
         }
     }
 
