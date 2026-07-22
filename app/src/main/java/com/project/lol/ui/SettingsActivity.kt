@@ -172,10 +172,12 @@ fun SettingsScreen(
     var swipeStop by remember { mutableStateOf(prefs.getBoolean("SwipeStop", true)) }
     var btAutoPause by remember { mutableStateOf(prefs.getBoolean("BtAutoPause", false)) }
     var btAutoResume by remember { mutableStateOf(prefs.getBoolean("BtAutoResume", false)) }
+    var playerMode by remember { mutableStateOf(prefs.getString("PlayerMode", "spotilol") ?: "spotilol") }
 
     var showClearCacheDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showAutoPlayDialog by remember { mutableStateOf(false) }
+    var showPlayerModeDialog by remember { mutableStateOf(false) }
     var showGuiModeDialog by remember { mutableStateOf(false) }
     var showCustomCssDialog by remember { mutableStateOf(false) }
 
@@ -230,6 +232,20 @@ fun SettingsScreen(
                     subtitle = autoplayLabel,
                     icon = Icons.Default.PlayCircle,
                     onClick = { showAutoPlayDialog = true }
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+
+                val playerModeLabel = when (playerMode) {
+                    "spotilol" -> "Spotilol Player"
+                    "original" -> "Spotify Original"
+                    else -> "Spotilol Player"
+                }
+                SettingTile(
+                    title = "Player Mode",
+                    subtitle = playerModeLabel,
+                    icon = Icons.Default.PlayCircle,
+                    onClick = { showPlayerModeDialog = true }
                 )
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
@@ -495,6 +511,22 @@ fun SettingsScreen(
                 prefs.edit().putString("APlayMode", value).apply()
             },
             onDismiss = { showAutoPlayDialog = false }
+        )
+    }
+
+    if (showPlayerModeDialog) {
+        SingleChoiceDialog(
+            title = "Player Mode",
+            options = listOf(
+                "spotilol" to "Spotilol Player",
+                "original" to "Spotify Original"
+            ),
+            selected = playerMode,
+            onSelect = { value ->
+                playerMode = value
+                prefs.edit().putString("PlayerMode", value).apply()
+            },
+            onDismiss = { showPlayerModeDialog = false }
         )
     }
 

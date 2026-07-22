@@ -36,7 +36,9 @@ class SpotifyWebViewClient(
             return
         }
 
-        injectPlayerControl(view)
+        view.postDelayed({
+            injectPlayerControl(view)
+        }, 500)
 
         view.evaluateJavascript(LOGOUT_CHECK_JS) { result ->
             if (result == "\"out\"") {
@@ -91,6 +93,7 @@ class SpotifyWebViewClient(
         val closeNowPlay = prefs.getBoolean("CloseNowPlay", true)
         val amoledEnabled = prefs.getBoolean("AmoledTheme", false)
         val customCss = prefs.getString("CustomCss", "") ?: ""
+        val playerMode = prefs.getString("PlayerMode", "spotilol") ?: "spotilol"
 
         val js = buildString {
             append("window.autoPlayMode='$autoPlayMode';\n")
@@ -104,12 +107,18 @@ class SpotifyWebViewClient(
             append(AUTO_FEATURES)
             append(ANDROID_AUTO_TRACKER)
             append(CSS_JS_HACK)
-            append(CUSTOM_PLAYER)
+            if (playerMode == "spotilol") {
+                append(CUSTOM_PLAYER)
+            }
         }
         val cleanJs = stripConsoleLogs(js) + "\n" +
                 buildAmoledJs(amoledEnabled) + "\n" +
                 buildCustomCssJs(customCss)
-        view.evaluateJavascript(cleanJs, null)
+        if (playerMode == "original") {
+            view.evaluateJavascript(cleanJs + "\n(function(){var s=document.createElement('style');s.textContent='aside[data-testid=\"now-playing-bar\"]{display:flex!important}';document.head.appendChild(s);})();", null)
+        } else {
+            view.evaluateJavascript(cleanJs, null)
+        }
     }
 
     private fun onPageFinishedClean(view: WebView, js: String) {
@@ -247,9 +256,6 @@ class SpotifyWebViewClient(
                 safeDefine(navigator, 'oscpu', function(){ return 'Windows NT 10.0; Win64; x64'; });
                 safeDefine(navigator, 'languages', function(){ return ['en-US','en']; });
                 safeDefine(navigator, 'language', function(){ return 'en-US'; });
-                safeDefine(navigator, 'hardwareConcurrency', function(){ return 8; });
-                safeDefine(navigator, 'deviceMemory', function(){ return 8; });
-                safeDefine(navigator, 'maxTouchPoints', function(){ return 0; });
                 safeDefine(navigator, 'plugins', function(){
                     var p = [
                         { name:'Chrome PDF Plugin', filename:'internal-pdf-viewer', description:'Portable Document Format' },
@@ -267,34 +273,6 @@ class SpotifyWebViewClient(
                     m.length = 2;
                     return m;
                 });
-                try {
-                    var getParam = WebGLRenderingContext.prototype.getParameter;
-                    WebGLRenderingContext.prototype.getParameter = function(p){
-                        if(p === 37445) return 'Google Inc. (NVIDIA)';
-                        if(p === 37446) return 'ANGLE (NVIDIA, NVIDIA GeForce GTX 1050 Ti Direct3D11 vs_5_0 ps_5_0, D3D11)';
-                        return getParam.call(this, p);
-                    };
-                } catch(e){}
-                try {
-                    if(navigator.mediaDevices){
-                        var origEnumerate = navigator.mediaDevices.enumerateDevices;
-                        navigator.mediaDevices.enumerateDevices = function(){
-                            return origEnumerate.call(this).then(function(devices){
-                                return devices.map(function(d){
-                                    var c = Object.assign({}, d);
-                                    if(d.kind === 'audioinput') c.label = 'Default - Microphone (Realtek High Definition Audio)';
-                                    if(d.kind === 'audiooutput') c.label = 'Default - Speakers (Realtek High Definition Audio)';
-                                    return c;
-                                });
-                            });
-                        };
-                    }
-                } catch(e){}
-                try {
-                    if(navigator.connection){
-                        Object.defineProperty(navigator.connection, 'rtt', { get: function(){ return 50; } });
-                    }
-                } catch(e){}
             })();
         """
 
@@ -512,9 +490,9 @@ class SpotifyWebViewClient(
                             ffDone=true;
                             AndBridge.manageTShut(true);
                             AndBridge.manageTSleep(false);
-                            addAutoFeatures();
-                            addCSSJSHack();
                             addAndAuto();
+                            setTimeout(addAutoFeatures, 1667);
+                            setTimeout(addCSSJSHack, 3333);
                             setTimeout(function(){ if(window.autoPlayMode!=='disabled' && playing) actPlayPause(true); },10000);
                         }
                     }
@@ -549,8 +527,11 @@ class SpotifyWebViewClient(
 
         private const val ANDROID_AUTO_TRACKER = """
             window.addAndAuto = function(){
-                if(aaint) clearInterval(aaint);
-                aaint = setInterval(function(){
+                if(aaint) {
+                    if(typeof aaint.disconnect==='function') { try { aaint.disconnect(); } catch(e){} }
+                    else { clearInterval(aaint); }
+                }
+                function readTrackState(){
                     var ta = document.querySelector('a[data-testid=context-item-link]');
                     if(ta) track=ta.text; else track=null;
                     var aa = document.querySelector('a[data-testid=context-item-info-artist]');
@@ -575,7 +556,20 @@ class SpotifyWebViewClient(
                         cover=s;
                     } else cover=null;
                     updMedia();
-                },1000);
+                }
+                try {
+                    var npTarget = document.querySelector('aside[data-testid="now-playing-bar"]') || document.body;
+                    var readTimeout;
+                    var obs = new MutationObserver(function(){
+                        clearTimeout(readTimeout);
+                        readTimeout = setTimeout(readTrackState, 200);
+                    });
+                    obs.observe(npTarget, { childList: true, subtree: true, attributes: true, characterData: true });
+                    aaint = obs;
+                    readTrackState();
+                } catch(e) {
+                    aaint = setInterval(readTrackState, 1000);
+                }
             };
         """
 
@@ -585,11 +579,11 @@ class SpotifyWebViewClient(
                 if(rc&&rc.parentNode.parentNode.ariaHidden=='false'){clickNP();}
             };
             window.clickNP=function(){
-                var rBtn=document.querySelector('#Desktop_PanelContainer_Id').parentNode.parentNode.nextElementSibling.querySelector('button');
-                if(rBtn){
+                var cab=document.querySelector('button[data-testid="cover-art-button"]')||document.querySelector('button[data-testid="control-button-npv"]');
+                if(cab){
                     var npHid=document.querySelector('#Desktop_LeftSidebar_Id').parentNode.parentNode.ariaHidden;
                     if(npHid&&npHid=='true') npBtn.classList.add('active'); else npBtn.classList.remove('active');
-                    rBtn.click();
+                    cab.click();
                 }
             };
             window.switchLs=function(){
@@ -636,7 +630,7 @@ class SpotifyWebViewClient(
                 },5000);
             };
             var st=document.createElement('style');
-            st.textContent='body{min-width:100%!important;min-height:100%!important} .os-scrollbar{opacity:0!important;visibility:hidden!important;pointer-events:none!important} .LayoutResizer__resize-bar{display:none!important} .LayoutResizer__resize-bar::after{display:none!important} .contentSpacing{padding:0} div[data-testid=root]{--panel-gap:0!important} #main-view+div,#main-view+div>div{overflow:hidden!important;width:auto} #main-view+div>div>div>div:nth-child(2)>div{width:100vw!important} div[data-encore-id=banner],#global-nav-bar>div:first-of-type,#global-nav-bar a[href="/download"],button[data-testid=fullscreen-mode-button],button[data-testid=friend-activity-button],div.main-view-container__mh-footer-container,li:has(>a[href*="spotify.com/premium"]),li:has(>a[href*="support.spotify.com"]),li:has(>a[href*="spotify.com/download"]){display:none!important} aside[data-testid="now-playing-bar"]{display:none!important} #spotilolPlayerControls{position:fixed;bottom:12px;left:12px;right:12px;z-index:9999;display:flex;flex-direction:column;padding:12px 14px 14px;background:rgba(24,24,24,.92);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,.06);border-radius:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,.6)} #spotilolPlayerControls .spl-top{display:flex;align-items:center;gap:10px;margin-bottom:8px} #spotilolPlayerControls .spl-cover{flex-shrink:0} #spotilolPlayerControls .spl-cover img{width:48px;height:48px;border-radius:10px;object-fit:cover;background:#282828} #spotilolPlayerControls .spl-info{flex:1;min-width:0;overflow:hidden} #spotilolPlayerControls .spl-track{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;transition:color .15s;cursor:pointer} #spotilolPlayerControls .spl-track:hover{color:#1db954} #spotilolPlayerControls .spl-artist{font-size:12px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;transition:color .15s;cursor:pointer} #spotilolPlayerControls .spl-artist:hover{color:#1db954} #spotilolPlayerControls .spl-row2{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px} #spotilolPlayerControls .spl-actions-left{display:flex;align-items:center;gap:2px} #spotilolPlayerControls .spl-liked-btn{color:rgba(255,255,255,.7)!important;position:relative} #spotilolPlayerControls .spl-liked-btn.spl-active{color:#1db954!important} #spotilolPlayerControls .spl-btn{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:8px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:color .15s,background .15s} #spotilolPlayerControls .spl-btn:hover{color:#fff;background:rgba(255,255,255,.1)} #spotilolPlayerControls .spl-btn-sm{padding:6px} #spotilolPlayerControls .spl-active{color:#1db954} #spotilolPlayerControls .spl-bottom{display:flex;align-items:center;gap:8px;width:100%;margin-bottom:6px} #spotilolPlayerControls .spl-time{font-size:10px;color:rgba(255,255,255,.45);min-width:30px;text-align:center;font-variant-numeric:tabular-nums} #spotilolPlayerControls .spl-bar-wrap{flex:1;position:relative;height:14px;display:flex;align-items:center} #spotilolPlayerControls .spl-bar{width:100%;height:4px;background:rgba(255,255,255,.12);border-radius:2px;cursor:pointer;position:relative} #spotilolPlayerControls .spl-fill{height:100%;background:#1db954;border-radius:2px;transition:width .4s linear;width:0%;position:relative} #spotilolPlayerControls .spl-handle{position:absolute;top:50%;width:12px;height:12px;background:#fff;border-radius:50%;transform:translate(-50%,-50%);left:0%;opacity:0;transition:opacity .15s;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.5)} #spotilolPlayerControls .spl-bar-wrap:hover .spl-handle{opacity:1} #spotilolPlayerControls .spl-transport{display:flex;align-items:center;justify-content:center;gap:16px;padding:2px 0} #spotilolPlayerControls .spl-play{background:rgba(255,255,255,.1)!important;color:#fff!important;padding:10px!important} #spotilolPlayerControls .spl-play:hover{background:rgba(255,255,255,.2)!important} @media(max-width:420px){#spotilolPlayerControls{bottom:8px;left:8px;right:8px;padding:8px 10px 10px;border-radius:14px} #spotilolPlayerControls .spl-cover img{width:42px;height:42px;border-radius:8px} #spotilolPlayerControls .spl-track{font-size:13px} #spotilolPlayerControls .spl-artist{font-size:11px} #spotilolPlayerControls .spl-actions-left{gap:0} #spotilolPlayerControls .spl-btn-sm{padding:5px} #spotilolPlayerControls .spl-transport{gap:12px} #spotilolPlayerControls .spl-play{padding:8px!important}} section[data-testid=artist-page]>div>div:first-child:not([data-encore-id]){height:25vh} div[data-testid=tracklist-row]{padding:0 10px 0 0;grid-gap:0} div[data-testid=tracklist-row] button:not([data-testid=add-to-playlist-button]){transform:scale(1.3)!important;opacity:0.6!important} div[data-testid=tracklist-row] button:{-webkit-margin-end:0!important} div[data-testid=tracklist-row] button:hover{color:#2d6!important} div[data-testid=tracklist-row]>div:first-child>div:first-child{height:24px;min-height:24px;min-width:24px;margin:0 8px!important} [aria-colcount="3"] div[data-testid=tracklist-row]{grid-template-columns:[index] var(--tracklist-index-column-width,40px) [first] minmax(120px,var(--col1,4fr)) [last] minmax(82px,var(--col2,1fr))!important} [aria-colcount="4"] div[data-testid=tracklist-row]{grid-template-columns:[index] var(--tracklist-index-column-width,40px) [first] minmax(120px,var(--col1,4fr)) [var1] minmax(120px,var(--col2,2fr)) [last] minmax(82px,var(--col3,1fr))!important} [aria-colcount="5"] div[data-testid=tracklist-row]{grid-template-columns:[index] var(--tracklist-index-column-width,40px) [first] minmax(120px,var(--col1,6fr)) [var1] minmax(120px,var(--col2,4fr)) [var2] minmax(120px,var(--col3,3fr)) [last] minmax(82px,var(--col4,1fr))!important} section[data-testid=track-page]>div.contentSpacing>div:nth-child(2) [aria-colcount="2"] div[data-testid=tracklist-row]{grid-template-columns:[first] minmax(120px,var(--col0,4fr)) [last] minmax(82px,var(--col1,1fr))!important} section[data-testid=track-page]>div.contentSpacing>div:nth-child(2) [aria-colcount="3"] div[data-testid=tracklist-row]{grid-template-columns:[first] minmax(120px,var(--col0,4fr)) [var1] minmax(120px,var(--col1,2fr)) [last] minmax(82px,var(--col2,1fr))!important} .npbtn{cursor:pointer;color:#b3b3b3;background:transparent;border:none;width:32px;height:32px;padding:8px} .npbtn.active{color:#FFFFFF} *{--content-spacing:10px} section[data-testid=home-page] .contentSpacing{padding:0 10px!important;overflow:hidden} [data-shelf-collapsable="true"]{display:none!important} div[data-testid=grid-container]{margin-inline:0!important;column-gap:0!important;overflow:hidden!important} div[data-testid=action-bar-row],div[data-testid=topbar-content]{padding:5px 10px} div[data-testid=track-list]>div:first-child,div[data-testid=playlist-tracklist]>div:first-child{margin:0!important;padding:0!important} main>section:not([data-testid=artist-page])>div:first-child{height:auto!important;min-height:auto!important;padding:10px} section[data-testid=track-page]>div>div.contentSpacing>div:last-child{overflow:hidden} section[data-testid=artist-page]>div>div:first-child>div.contentSpacing{padding:10px} section[data-testid=artist-page] div[data-testid=grid-container] h2,section[data-testid=artist-page] section[data-testid=component-shelf]{padding:0 10px} main>section h1.encore-text-headline-large{font-size:22px!important} section[data-testid=artist-page] span.encore-text-headline-large{font-size:26px!important} section[data-testid=track-page] h1{font-size:20px!important} aside[data-testid=now-playing-bar]{min-width:100%!important;box-shadow:none!important;background:#000000!important} aside[data-testid=now-playing-bar]>div:first-child{margin-top:2px;flex-direction:column!important;height:auto!important} aside[data-testid=now-playing-bar]>div>div{width:100%!important} aside[data-testid=now-playing-bar]>div>div:last-child>div{min-height:32px;margin:5px 10px} aside[data-testid=now-playing-bar]>div>div:last-child button{transform:scale(1.15);margin:0 5px} div[data-testid=general-controls]{margin:15px 0 25px} div[data-testid=general-controls] button{transform:scale(1.4)!important;margin:0 8px!important} div[data-testid=player-controls]{margin:5px 0} div[data-testid=now-playing-widget]{justify-content:center;overflow:hidden} form[role=search]{z-index:10;margin-left:48px;max-width:88%} div[data-testid=now-playing-widget]>div:last-child>button{transform:scale(1.3)} div[data-testid=now-playing-widget]>div:first-child{display:none!important} div[data-testid=now-playing-widget]>div:nth-child(2){display:flex!important;overflow:hidden!important} div[data-testid=now-playing-widget]>div:nth-child(2) span{font-size:13px!important;height:20px!important;margin:0!important} div[data-testid=now-playing-widget]>div:nth-child(2)>div{min-width:auto;max-width:66%} [data-tippy-root]{overflow:hidden!important} [data-tippy-root],[data-tippy-root] *{transition:none!important;transform:none!important} div[data-testid=hover-or-focus-tooltip],#Desktop_LeftSidebar_Id header>div>div:last-child{display:none!important} #Desktop_LeftSidebar_Id>nav>div{min-height:48px;border-radius:25px} .YourLibraryX{overflow:hidden;background:var(--background-elevated-base)!important} .YourLibraryX header{padding:14px} #spotilolPlayerControls .spl-disabled{opacity:.3!important;pointer-events:none}';
+            st.textContent='body{min-width:100%!important;min-height:100%!important} .os-scrollbar{opacity:0!important;visibility:hidden!important;pointer-events:none!important} .LayoutResizer__resize-bar{display:none!important} .LayoutResizer__resize-bar::after{display:none!important} .contentSpacing{padding:0} div[data-testid=root]{--panel-gap:0!important;contain:layout style!important} #main-view+div,#main-view+div>div{overflow:hidden!important;width:auto} #main-view+div>div>div>div:nth-child(2)>div{width:100vw!important} div[data-encore-id=banner],#global-nav-bar>div:first-of-type,#global-nav-bar a[href="/download"],button[data-testid=fullscreen-mode-button],button[data-testid=friend-activity-button],div.main-view-container__mh-footer-container,li:has(>a[href*="spotify.com/premium"]),li:has(>a[href*="support.spotify.com"]),li:has(>a[href*="spotify.com/download"]){display:none!important} aside[data-testid="now-playing-bar"]{display:none!important} #spotilolPlayerControls{position:fixed;bottom:12px;left:12px;right:12px;z-index:9999;display:flex;flex-direction:column;padding:12px 14px 14px;background:rgba(24,24,24,.95);border:1px solid rgba(255,255,255,.06);border-radius:16px;will-change:transform!important;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,.6)} #spotilolPlayerControls .spl-top{display:flex;align-items:center;gap:10px;margin-bottom:8px} #spotilolPlayerControls .spl-cover{flex-shrink:0} #spotilolPlayerControls .spl-cover img{width:48px;height:48px;border-radius:10px;object-fit:cover;background:#282828} #spotilolPlayerControls .spl-info{flex:1;min-width:0;overflow:hidden} #spotilolPlayerControls .spl-track{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;transition:color .15s;cursor:pointer} #spotilolPlayerControls .spl-track:hover{color:#1db954} #spotilolPlayerControls .spl-artist{font-size:12px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;transition:color .15s;cursor:pointer} #spotilolPlayerControls .spl-artist:hover{color:#1db954} #spotilolPlayerControls .spl-row2{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px} #spotilolPlayerControls .spl-actions-left{display:flex;align-items:center;gap:2px} #spotilolPlayerControls .spl-liked-btn{color:rgba(255,255,255,.7)!important;position:relative} #spotilolPlayerControls .spl-liked-btn.spl-active{color:#1db954!important} #spotilolPlayerControls .spl-btn{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:8px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:color .15s,background .15s} #spotilolPlayerControls .spl-btn:hover{color:#fff;background:rgba(255,255,255,.1)} #spotilolPlayerControls .spl-btn-sm{padding:6px} #spotilolPlayerControls .spl-active{color:#1db954} #spotilolPlayerControls .spl-bottom{display:flex;align-items:center;gap:8px;width:100%;margin-bottom:6px} #spotilolPlayerControls .spl-time{font-size:10px;color:rgba(255,255,255,.45);min-width:30px;text-align:center;font-variant-numeric:tabular-nums} #spotilolPlayerControls .spl-bar-wrap{flex:1;position:relative;height:14px;display:flex;align-items:center} #spotilolPlayerControls .spl-bar{width:100%;height:4px;background:rgba(255,255,255,.12);border-radius:2px;cursor:pointer;position:relative} #spotilolPlayerControls .spl-fill{height:100%;background:#1db954;border-radius:2px;transform-origin:left;transition:transform .4s linear;transform:scaleX(0);position:relative} #spotilolPlayerControls .spl-handle{position:absolute;top:50%;width:12px;height:12px;background:#fff;border-radius:50%;transform:translate(-50%,-50%);left:0%;opacity:0;transition:opacity .15s;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.5)} #spotilolPlayerControls .spl-bar-wrap:hover .spl-handle{opacity:1} #spotilolPlayerControls .spl-transport{display:flex;align-items:center;justify-content:center;gap:16px;padding:2px 0} #spotilolPlayerControls .spl-play{background:rgba(255,255,255,.1)!important;color:#fff!important;padding:10px!important} #spotilolPlayerControls .spl-play:hover{background:rgba(255,255,255,.2)!important} @media(max-width:420px){#spotilolPlayerControls{bottom:8px;left:8px;right:8px;padding:8px 10px 10px;border-radius:14px} #spotilolPlayerControls .spl-cover img{width:42px;height:42px;border-radius:8px} #spotilolPlayerControls .spl-track{font-size:13px} #spotilolPlayerControls .spl-artist{font-size:11px} #spotilolPlayerControls .spl-actions-left{gap:0} #spotilolPlayerControls .spl-btn-sm{padding:5px} #spotilolPlayerControls .spl-transport{gap:12px} #spotilolPlayerControls .spl-play{padding:8px!important}} section[data-testid=artist-page]>div>div:first-child:not([data-encore-id]){height:25vh} div[data-testid=tracklist-row]{padding:0 10px 0 0;grid-gap:0} div[data-testid=tracklist-row] button:not([data-testid=add-to-playlist-button]){transform:scale(1.3)!important;opacity:0.6!important} div[data-testid=tracklist-row] button:{-webkit-margin-end:0!important} div[data-testid=tracklist-row] button:hover{color:#2d6!important} div[data-testid=tracklist-row]>div:first-child>div:first-child{height:24px;min-height:24px;min-width:24px;margin:0 8px!important} [aria-colcount="3"] div[data-testid=tracklist-row]{grid-template-columns:[index] var(--tracklist-index-column-width,40px) [first] minmax(120px,var(--col1,4fr)) [last] minmax(82px,var(--col2,1fr))!important} [aria-colcount="4"] div[data-testid=tracklist-row]{grid-template-columns:[index] var(--tracklist-index-column-width,40px) [first] minmax(120px,var(--col1,4fr)) [var1] minmax(120px,var(--col2,2fr)) [last] minmax(82px,var(--col3,1fr))!important} [aria-colcount="5"] div[data-testid=tracklist-row]{grid-template-columns:[index] var(--tracklist-index-column-width,40px) [first] minmax(120px,var(--col1,6fr)) [var1] minmax(120px,var(--col2,4fr)) [var2] minmax(120px,var(--col3,3fr)) [last] minmax(82px,var(--col4,1fr))!important} section[data-testid=track-page]>div.contentSpacing>div:nth-child(2) [aria-colcount="2"] div[data-testid=tracklist-row]{grid-template-columns:[first] minmax(120px,var(--col0,4fr)) [last] minmax(82px,var(--col1,1fr))!important} section[data-testid=track-page]>div.contentSpacing>div:nth-child(2) [aria-colcount="3"] div[data-testid=tracklist-row]{grid-template-columns:[first] minmax(120px,var(--col0,4fr)) [var1] minmax(120px,var(--col1,2fr)) [last] minmax(82px,var(--col2,1fr))!important} .npbtn{cursor:pointer;color:#b3b3b3;background:transparent;border:none;width:32px;height:32px;padding:8px} .npbtn.active{color:#FFFFFF} *{--content-spacing:10px} section[data-testid=home-page] .contentSpacing{padding:0 10px!important;overflow:hidden} [data-shelf-collapsable="true"]{display:none!important} div[data-testid=grid-container]{margin-inline:0!important;column-gap:0!important;overflow:hidden!important} div[data-testid=action-bar-row],div[data-testid=topbar-content]{padding:5px 10px} div[data-testid=track-list]>div:first-child,div[data-testid=playlist-tracklist]>div:first-child{margin:0!important;padding:0!important} main>section:not([data-testid=artist-page])>div:first-child{height:auto!important;min-height:auto!important;padding:10px} section[data-testid=track-page]>div>div.contentSpacing>div:last-child{overflow:hidden} section[data-testid=artist-page]>div>div:first-child>div.contentSpacing{padding:10px} section[data-testid=artist-page] div[data-testid=grid-container] h2,section[data-testid=artist-page] section[data-testid=component-shelf]{padding:0 10px} main>section h1.encore-text-headline-large{font-size:22px!important} section[data-testid=artist-page] span.encore-text-headline-large{font-size:26px!important} section[data-testid=track-page] h1{font-size:20px!important} aside[data-testid=now-playing-bar]{min-width:100%!important;box-shadow:none!important;background:#000000!important} aside[data-testid=now-playing-bar]>div:first-child{margin-top:2px;flex-direction:column!important;height:auto!important} aside[data-testid=now-playing-bar]>div>div{width:100%!important} aside[data-testid=now-playing-bar]>div>div:last-child>div{min-height:32px;margin:5px 10px} aside[data-testid=now-playing-bar]>div>div:last-child button{transform:scale(1.15);margin:0 5px} div[data-testid=general-controls]{margin:15px 0 25px} div[data-testid=general-controls] button{transform:scale(1.4)!important;margin:0 8px!important} div[data-testid=player-controls]{margin:5px 0} div[data-testid=now-playing-widget]{justify-content:center;overflow:hidden} form[role=search]{z-index:10;margin-left:48px;max-width:88%} div[data-testid=now-playing-widget]>div:last-child>button{transform:scale(1.3)} div[data-testid=now-playing-widget]>div:first-child{display:none!important} div[data-testid=now-playing-widget]>div:nth-child(2){display:flex!important;overflow:hidden!important} div[data-testid=now-playing-widget]>div:nth-child(2) span{font-size:13px!important;height:20px!important;margin:0!important} div[data-testid=now-playing-widget]>div:nth-child(2)>div{min-width:auto;max-width:66%} [data-tippy-root]{overflow:hidden!important} [data-tippy-root],[data-tippy-root] *{transition:none!important;transform:none!important} div[data-testid=hover-or-focus-tooltip],#Desktop_LeftSidebar_Id header>div>div:last-child{display:none!important} #Desktop_LeftSidebar_Id>nav>div{min-height:48px;border-radius:25px} .YourLibraryX{overflow:hidden;background:var(--background-elevated-base)!important;contain:layout style!important} .YourLibraryX header{padding:14px} #spotilolPlayerControls .spl-disabled{opacity:.3!important;pointer-events:none}';
             try{var target=document.head||document.documentElement;if(target)target.appendChild(st);else{document.addEventListener('DOMContentLoaded',function(){var t=document.head||document.documentElement;if(t)t.appendChild(st);});}}catch(e){}
         """
 
@@ -716,85 +710,88 @@ class SpotifyWebViewClient(
                 document.addEventListener('mousemove',function(e){if(dragging)seekTo(e)});
                 document.addEventListener('touchmove',function(e){if(dragging)seekTo(e.touches[0])},{passive:true});
                 document.addEventListener('mouseup',function(){dragging=false});
-                document.addEventListener('touchend',function(){dragging=false});
+                document.addEventListener('touchend',function(){dragging=false});                    window.splUpdate=function(){
+                        var ci=document.getElementById('spl-cover-img');
+                        var tk=document.getElementById('spl-track');
+                        var ar=document.getElementById('spl-artist');
+                        var fl=document.getElementById('spl-fill');
+                        var hd=document.getElementById('spl-handle');
+                        var ps=document.getElementById('spl-pos');
+                        var ds=document.getElementById('spl-dur');
+                        var pp=document.getElementById('spl-play');
+                        var sh=document.getElementById('spl-shuffle');
+                        var rp=document.getElementById('spl-repeat');
+                        var lk=document.getElementById('spl-liked');
+                        var ly=document.getElementById('spl-lyrics');
+                        var tm=document.getElementById('spl-timer');
 
-                window.splUpdate=function(){
-                    var ci=document.getElementById('spl-cover-img');
-                    var tk=document.getElementById('spl-track');
-                    var ar=document.getElementById('spl-artist');
-                    var fl=document.getElementById('spl-fill');
-                    var hd=document.getElementById('spl-handle');
-                    var ps=document.getElementById('spl-pos');
-                    var ds=document.getElementById('spl-dur');
-                    var pp=document.getElementById('spl-play');
-                    var sh=document.getElementById('spl-shuffle');
-                    var rp=document.getElementById('spl-repeat');
-                    var lk=document.getElementById('spl-liked');
-                    var ly=document.getElementById('spl-lyrics');
-                    var tm=document.getElementById('spl-timer');
+                        var npb=document.querySelector('[data-testid="now-playing-widget"]');
+                        var imgEl=npb?npb.querySelector('img[data-testid="cover-art-image"]'):null;
+                        if(ci&&imgEl&&imgEl.src&&ci.src!==imgEl.src) ci.src=imgEl.src;
 
-                    var npb=document.querySelector('[data-testid="now-playing-widget"]');
-                    var imgEl=npb?npb.querySelector('img[data-testid="cover-art-image"]'):null;
-                    if(ci&&imgEl&&imgEl.src&&ci.src!==imgEl.src) ci.src=imgEl.src;
+                        var trackEl=document.querySelector('a[data-testid=context-item-link]');
+                        if(tk&&trackEl&&trackEl.textContent&&tk.textContent!==trackEl.textContent) tk.textContent=trackEl.textContent;
 
-                    var trackEl=document.querySelector('a[data-testid=context-item-link]');
-                    if(tk&&trackEl&&trackEl.textContent&&tk.textContent!==trackEl.textContent) tk.textContent=trackEl.textContent;
+                        var artistEl=document.querySelector('a[data-testid=context-item-info-artist]');
+                        if(!artistEl) artistEl=document.querySelector('a[data-testid=context-item-info-show]');
+                        if(ar&&artistEl&&tk.textContent!=='No track') ar.textContent=artistEl.textContent||'';
 
-                    var artistEl=document.querySelector('a[data-testid=context-item-info-artist]');
-                    if(!artistEl) artistEl=document.querySelector('a[data-testid=context-item-info-show]');
-                    if(ar&&artistEl&&tk.textContent!=='No track') ar.textContent=artistEl.textContent||'';
-
-                    var rg=document.querySelector('[data-testid="playback-progressbar"] input[type=range]');
-                    if(pp){
-                        var pb=document.querySelector('button[data-testid=control-button-playpause]');
-                        var isPlaying=pb&&pb.getAttribute('aria-label')!=='Play';
-                        pp.innerHTML=isPlaying
-                            ?'<svg viewBox="0 0 16 16" width="22" height="22"><path fill="currentColor" d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7z"/></svg>'
-                            :'<svg viewBox="0 0 16 16" width="22" height="22"><path fill="currentColor" d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288z"/></svg>';
-                    }
-                    if(sh){
-                        var sb=document.querySelector('button[data-testid=control-button-shuffle]');
-                        sh.classList.toggle('spl-active',sb&&sb.getAttribute('aria-checked')==='true');
-                    }
-                    if(rp){
-                        var rr=document.querySelector('button[data-testid=control-button-repeat]');
-                        rp.classList.toggle('spl-active',rr&&rr.getAttribute('aria-checked')==='true');
-                    }
-                    if(lk){
-                        var fb=document.querySelector('div[data-testid=now-playing-widget]>div:last-child>button');
-                        var liked=fb&&fb.getAttribute('aria-checked')==='true';
-                        lk.classList.toggle('spl-active',liked===true);
-                    }
-                    var lb=document.querySelector('button[data-testid=lyrics-button]');
-                    if(lb){
-                        ly.style.display='';
-                        ly.classList.toggle('spl-disabled',lb.disabled||lb.getAttribute('aria-disabled')==='true');
-                    } else {
-                        ly.style.display='none';
-                    }
-                    if(tm) tm.classList.toggle('spl-active',typeof sleepTimerActive!=='undefined'&&sleepTimerActive&&sleepTimerActive.value);
-
-                    var pbEl=document.querySelector('[data-testid="playback-progressbar"] [data-testid="progress-bar"]');
-                    if(pbEl){
-                        var cs=getComputedStyle(pbEl);
-                        var tr=cs.getPropertyValue('--progress-bar-transform');
-                        if(tr){
-                            var pct=parseFloat(tr)||0;
-                            if(fl) fl.style.width=pct+'%';
-                            if(hd) hd.style.left=pct+'%';
+                        var rg=document.querySelector('[data-testid="playback-progressbar"] input[type=range]');
+                        if(pp){
+                            var pb=document.querySelector('button[data-testid=control-button-playpause]');
+                            var isPlaying=pb&&pb.getAttribute('aria-label')!=='Play';
+                            pp.innerHTML=isPlaying
+                                ?'<svg viewBox="0 0 16 16" width="22" height="22"><path fill="currentColor" d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7z"/></svg>'
+                                :'<svg viewBox="0 0 16 16" width="22" height="22"><path fill="currentColor" d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288z"/></svg>';
                         }
-                    }
-                    var posEl=document.querySelector('[data-testid="playback-position"]');
-                    var durEl=document.querySelector('[data-testid="playback-duration"]');
-                    if(ps&&posEl) ps.textContent=posEl.textContent;
-                    if(ds&&durEl) ds.textContent=durEl.textContent;
-                };
-                function formatTime(ms){
-                    var t=Math.floor(ms/1000);
-                    return Math.floor(t/60)+':'+(t%60<10?'0':'')+t%60;
-                }
+                        if(sh){
+                            var sb=document.querySelector('button[data-testid=control-button-shuffle]');
+                            sh.classList.toggle('spl-active',sb&&sb.getAttribute('aria-checked')==='true');
+                        }
+                        if(rp){
+                            var rr=document.querySelector('button[data-testid=control-button-repeat]');
+                            rp.classList.toggle('spl-active',rr&&rr.getAttribute('aria-checked')==='true');
+                        }
+                        if(lk){
+                            var fb=document.querySelector('div[data-testid=now-playing-widget]>div:last-child>button');
+                            var liked=fb&&fb.getAttribute('aria-checked')==='true';
+                            lk.classList.toggle('spl-active',liked===true);
+                        }
+                        var lb=document.querySelector('button[data-testid=lyrics-button]');
+                        if(lb){
+                            ly.style.display='';
+                            ly.classList.toggle('spl-disabled',lb.disabled||lb.getAttribute('aria-disabled')==='true');
+                        } else {
+                            ly.style.display='none';
+                        }
+                        if(tm) tm.classList.toggle('spl-active',typeof sleepTimerActive!=='undefined'&&sleepTimerActive&&sleepTimerActive.value);
 
-                setInterval(splUpdate,500);
+                        var pbEl=document.querySelector('[data-testid="playback-progressbar"] [data-testid="progress-bar"]');
+                        if(pbEl){
+                            var cs=getComputedStyle(pbEl);
+                            var tr=cs.getPropertyValue('--progress-bar-transform');
+                            if(tr){
+                                var pct=parseFloat(tr)||0;
+                                if(fl) fl.style.transform='scaleX('+(pct/100)+')';
+                                if(hd) hd.style.left=pct+'%';
+                            }
+                        }
+                        var posEl=document.querySelector('[data-testid="playback-position"]');
+                        var durEl=document.querySelector('[data-testid="playback-duration"]');
+                        if(ps&&posEl) ps.textContent=posEl.textContent;
+                        if(ds&&durEl) ds.textContent=durEl.textContent;
+                    };
+                    function formatTime(ms){
+                        var t=Math.floor(ms/1000);
+                        return Math.floor(t/60)+':'+(t%60<10?'0':'')+t%60;
+                    }
+
+                    var rafLastTime=0;
+                    function rafUpdate(timestamp){
+                        if(timestamp-rafLastTime>100){ splUpdate(); rafLastTime=timestamp; }
+                        requestAnimationFrame(rafUpdate);
+                    }
+                    requestAnimationFrame(rafUpdate);
             };
             if(document.readyState==='complete') initSpotilolPlayer();
             else window.addEventListener('load',initSpotilolPlayer);
