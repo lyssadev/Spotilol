@@ -128,6 +128,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // After an OOM kill, Android can resume directly at MainActivity
+        // skipping CertificateActivity. Redirect there so the proxy starts.
         if (!LocalProxyManager.isRunning) {
             startActivity(Intent(this, CertificateActivity::class.java))
             finish()
@@ -616,6 +618,21 @@ class MainActivity : ComponentActivity() {
                 btPermLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        webView?.evaluateJavascript("""
+            try {
+                document.querySelectorAll('video').forEach(function(v) {
+                    if(v.muted || v.hasAttribute('loop') || v.style.objectFit === 'cover') {
+                        v.pause();
+                        v.removeAttribute('src');
+                        v.load();
+                    }
+                });
+            } catch(e) {}
+        """.trimIndent(), null)
     }
 
     override fun onResume() {
