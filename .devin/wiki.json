@@ -1,0 +1,67 @@
+{
+  "repo_notes": [
+    {
+      "content": "This is an Android app (Spotilol) that wraps the Spotify Web Player in a WebView with a local MITM proxy to inject custom JS/CSS, bypass GDPR dialogs, spoof browser fingerprint, add custom playback controls, and block ads/analytics. The project is written in Kotlin using Jetpack Compose.",
+      "author": "Maintainer"
+    },
+    {
+      "content": "The webview/ directory contains the core logic: SpotifyWebViewClient handles page loading and JS injection orchestration, SpotifyWebChromeClient handles child windows and progress. Under webview/injections/ there are 16 Kotlin objects each holding a const val CONTENT with raw JavaScript (browser spoofing, fetch override, player controls, library fetcher, CSS hacks, etc.). Under webview/helpers/ there are utility functions: JsUtils (strip console logs), AmoledTheme (build AMOLED JS), CssInjector (build custom CSS JS), AdBlocker (analytics domain blocking).",
+      "author": "Maintainer"
+    },
+    {
+      "content": "The bridge/ package contains SpotifyBridge which uses @JavascriptInterface to expose Kotlin methods to the WebView JS context (login detection, media position, playback state, sleep timer). The proxy/ package contains LocalProxyManager which implements a local MITM proxy with dynamic certificate generation (RSA 2048-bit leaf keypair caching) for intercepting Spotify API traffic.",
+      "author": "Maintainer"
+    },
+    {
+      "content": "The ui/ package has MainActivity (Jetpack Compose, holds the WebView and playback UI), SettingsActivity (Jetpack Compose settings screen), SplashActivity (animated splash screen), and theme/ (Saira font family, dark AMOLED theme). The service/ package has MediaNotificationService for notification/ lock screen controls. The update/ package has UpdateChecker for GitHub release checking.",
+      "author": "Maintainer"
+    }
+  ],
+  "pages": [
+    {
+      "title": "Architecture Overview",
+      "purpose": "High-level architecture of Spotilol: how the WebView, MITM proxy, JS injection, and Android services interact to wrap and enhance the Spotify Web Player",
+      "parent": null
+    },
+    {
+      "title": "WebView & JS Injection System",
+      "purpose": "How SpotifyWebViewClient orchestrates JS injection at page load, the 16 injection objects in webview/injections/, and how they modify Spotify's web app behavior",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "JS Injection Objects Reference",
+      "purpose": "Detailed reference for each of the 16 JS injection objects (BrowserSpoof, FetchOverride, PlayerCore, MediaUpdater, LibraryFetcher, LibraryParser, PlaybackControls, MainLoop, AutoFeatures, AndroidTracker, CssHack, SpotilolPlayer, FbGdprBypass, ClassicLoginButton, LogoutCheck, LoginDetection) — what each one does and when it's injected",
+      "parent": "WebView & JS Injection System"
+    },
+    {
+      "title": "Helper Utilities",
+      "purpose": "Documentation of webview/helpers/: JsUtils (console log stripping), AmoledTheme (AMOLED CSS builder), CssInjector (custom CSS injection), AdBlocker (analytics/ad CDN domain blocking)",
+      "parent": "WebView & JS Injection System"
+    },
+    {
+      "title": "MITM Proxy System",
+      "purpose": "How LocalProxyManager implements a local man-in-the-middle proxy to intercept Spotify API calls, including certificate generation (RSA keypair caching), request interception, and ad-blocking logic",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "Kotlin-JS Bridge (SpotifyBridge)",
+      "purpose": "Document the @JavascriptInterface methods exposed to the WebView: login detection, media position updates, sleep timer, play loaded callbacks, and CSS injection acknowledgment",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "UI Layer",
+      "purpose": "Documentation of ui/ package: MainActivity (Jetpack Compose UI with WebView, custom player controls, settings), SettingsActivity (preferences for AMOLED mode, custom CSS, sleep timer, Bluetooth auto-pause), SplashActivity (animated splash), and theme/ (Saira font, AMOLED dark theme)",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "Media Notification & Lock Screen",
+      "purpose": "How MediaNotificationService handles media playback notifications, lock screen controls, Bluetooth auto-pause/resume, and memory management (onTrimMemory)",
+      "parent": "Architecture Overview"
+    },
+    {
+      "title": "Build & Configuration",
+      "purpose": "Build system (Gradle Kotlin DSL), dependency management (libs.versions.toml), ProGuard rules (minification keep rules for JS bridge, injections, BouncyCastle), and network security config for the proxy CA certificate",
+      "parent": null
+    }
+  ]
+}

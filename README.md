@@ -1,6 +1,6 @@
-<p align="center">
-  <img src="art/spotilolicon.png" alt="Spotilol Logo" width="128" height="128">
-</p>
+<div align="center">
+  <img src="art/bgwelcome.jpg" alt="Spotilol" style="width: 100%; max-width: 900px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+</div>
 
 <h1 align="center">Spotilol</h1>
 
@@ -30,11 +30,15 @@
   a lil Android app that wraps Spotify's web player with built-in adblocking.
 </p>
 
-it's a fork of **Spotifuck** by **deviato**, ported from smali to clean Kotlin. all free, all open-source.
+<p align="center">
+  it's a fork of <strong>Spotifuck</strong> by <strong>deviato</strong>, ported from smali to clean Kotlin. all free, all open-source.
+</p>
 
-runs a local MITM proxy with a custom CA cert so Spotify doesn't clock you're on a WebView. that's the magic trick. everything else passes through untouched.
+<p align="center">
+  runs a local MITM proxy with a custom CA cert so Spotify doesn't clock you're on a WebView. that's the magic trick. everything else passes through untouched.
+</p>
 
----
+<div align="center" style="height: 25px; width: 78%; background-color: #DFDBE5; background-image: url('art/pattern.svg'); background-size: 600px 600px; border-radius: 8px; margin: 32px auto;"></div>
 
 ## Preview
 
@@ -44,7 +48,7 @@ runs a local MITM proxy with a custom CA cert so Spotify doesn't clock you're on
   <img src="art/spotilol_ss3.webp" alt="screenshot 3" width="30%" style="max-width: 250px; margin: 4px; border-radius: 12px;" />
 </div>
 
----
+<div align="center" style="height: 25px; width: 78%; background-color: #DFDBE5; background-image: url('art/pattern.svg'); background-size: 600px 600px; border-radius: 8px; margin: 32px auto;"></div>
 
 ## Download
 
@@ -52,7 +56,7 @@ grab the latest APK from the [releases page](https://github.com/lyssadev/spotilo
 
 download the `.apk` file and install it on your device. you may need to toggle **"Install from unknown sources"** in your Settings.
 
----
+<div align="center" style="height: 25px; width: 78%; background-color: #DFDBE5; background-image: url('art/pattern.svg'); background-size: 600px 600px; border-radius: 8px; margin: 32px auto;"></div>
 
 ## Features
 
@@ -66,7 +70,7 @@ download the `.apk` file and install it on your device. you may need to toggle *
 - browse your library through Spotify's API
 - update checker (auto & manual)
 
----
+<div align="center" style="height: 25px; width: 78%; background-color: #DFDBE5; background-image: url('art/pattern.svg'); background-size: 600px 600px; border-radius: 8px; margin: 32px auto;"></div>
 
 ## Requirements
 
@@ -74,7 +78,7 @@ download the `.apk` file and install it on your device. you may need to toggle *
 - a Spotify account (free or premium)
 - Google Chrome / WebView (comes with your phone)
 
----
+<div align="center" style="height: 25px; width: 78%; background-color: #DFDBE5; background-image: url('art/pattern.svg'); background-size: 600px 600px; border-radius: 8px; margin: 32px auto;"></div>
 
 ## Quick Start: The Certificate Thing
 
@@ -89,7 +93,7 @@ Spotilol generates a local CA cert so Spotify doesn't know you're in a WebView. 
 
 > **Note:** if you ever clear your device's credential storage (like after a factory reset), you'll have to do this again.
 
----
+<div align="center" style="height: 25px; width: 78%; background-color: #DFDBE5; background-image: url('art/pattern.svg'); background-size: 600px 600px; border-radius: 8px; margin: 32px auto;"></div>
 
 ## Build It Yourself
 
@@ -101,13 +105,13 @@ cd Spotilol
 
 APK lands at `app/build/outputs/apk/debug/app-debug.apk`.
 
----
+<div align="center" style="height: 25px; width: 78%; background-color: #DFDBE5; background-image: url('art/pattern.svg'); background-size: 600px 600px; border-radius: 8px; margin: 32px auto;"></div>
 
 ## Contributing
 
 contributions are welcome. open issues, throw PRs, suggest stuff — free for all.
 
----
+<div align="center" style="height: 25px; width: 78%; background-color: #DFDBE5; background-image: url('art/pattern.svg'); background-size: 600px 600px; border-radius: 8px; margin: 32px auto;"></div>
 
 ## Credits
 
