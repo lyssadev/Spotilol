@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="art/bgwelcome.jpg" alt="Spotilol" style="width: 100%; max-width: 900px; border-radius: 40px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+  <img src="art/bgwelcome.png" alt="Spotilol" style="width: 100%; max-width: 900px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
 </div>
 
 <h1 align="center">Spotilol</h1>
