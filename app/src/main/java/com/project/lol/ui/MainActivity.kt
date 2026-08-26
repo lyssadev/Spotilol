@@ -445,13 +445,18 @@ class MainActivity : ComponentActivity() {
 
                                         val executor = Executors.newSingleThreadExecutor()
                                         if (useProxy && LocalProxyManager.isRunning) {
+                                            // ProxyController requires a scheme (http://, socks://, or direct).
+                                            // A bare "host:port" is parsed as scheme="host" and silently falls
+                                            // back to DIRECT, so MITM never actually happens. Always include
+                                            // the http:// scheme and surface errors via the callback instead
+                                            // of swallowing them.
                                             val proxyConfig = ProxyConfig.Builder()
-                                                .addProxyRule("localhost:${LocalProxyManager.port}")
+                                                .addProxyRule("http://localhost:${LocalProxyManager.port}")
                                                 .build()
                                             ProxyController.getInstance().setProxyOverride(
                                                 proxyConfig,
                                                 executor,
-                                                { }
+                                                { android.util.Log.d("MainActivity", "Proxy override applied: http://localhost:${LocalProxyManager.port}") }
                                             )
                                         } else {
                                             ProxyController.getInstance().clearProxyOverride(executor, { })
