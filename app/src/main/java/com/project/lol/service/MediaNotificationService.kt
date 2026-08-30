@@ -116,6 +116,28 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         }
     }
 
+    private var lastMediaStatusJson: String? = null
+
+    private val prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "AndAuto") {
+            val andAuto = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
+                .getBoolean("AndAuto", true)
+            if (andAuto) {
+                lastMediaStatusJson?.let { updateFromMediaStatus(it) }
+            } else {
+                currentTitle = ""
+                currentArtist = ""
+                lastCoverUrl = ""
+                coverBitmap = null
+                mainHandler.post {
+                    updatePlaybackState()
+                    updateMetadata()
+                    showNotification()
+                }
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -148,6 +170,8 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to register disconnect receivers", e)
         }
+        getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
+            .registerOnSharedPreferenceChangeListener(prefsListener)
     }
 
     @Suppress("DEPRECATION")
@@ -215,6 +239,8 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         try { unregisterReceiver(actionReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(bluetoothReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(audioBecomingNoisyReceiver) } catch (_: Exception) {}
+        getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
+            .unregisterOnSharedPreferenceChangeListener(prefsListener)
         if (::mediaSession.isInitialized) {
             try { mediaSession.release() } catch (_: Exception) {}
         }
@@ -342,6 +368,7 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
 
     fun updateFromMediaStatus(json: String) {
         try {
+            lastMediaStatusJson = json
             val obj = org.json.JSONObject(json)
             val andAuto = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
                 .getBoolean("AndAuto", true)
@@ -594,5 +621,19 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
             if (it.isHeld) it.release()
             wakeLock = null
         }
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val stopOnSwipe = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
+            .getBoolean("SwipeStop", true)
+        if (stopOnSwipe) {
+            if (::mediaSession.isInitialized) {
+                try { mediaSession.isActive = false } catch (_: Exception) {}
+            }
+            releaseWakeLock()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
     }
 }

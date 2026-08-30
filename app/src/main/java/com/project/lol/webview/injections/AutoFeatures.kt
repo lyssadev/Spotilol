@@ -11,7 +11,7 @@ object AutoFeatures {
                 afint = setInterval(function(){
                     if(window.closeNpPref) closeNowPlay();
                     var ft = document.querySelector('aside div.encore-bright-accent-set button');
-                    if(ft) {
+                    if(ft && window.__splTakeControl) {
                         ft.click();
                         setTimeout(function(){
                             var cb = document.querySelector('aside ul[role=list] li[role=listitem] div[role=button]');

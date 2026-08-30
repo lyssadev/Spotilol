@@ -227,11 +227,13 @@ class SpotifyWebViewClient(
         val customCss = prefs.getString("CustomCss", "") ?: ""
         val playerMode = prefs.getString("PlayerMode", "spotilol") ?: "spotilol"
         val useProxy = prefs.getString("ConnectionMode", "normal") == "proxy"
+        val takeControl = prefs.getBoolean("TakeControl", true)
 
         val js = buildString {
             append("window.autoPlayMode='$autoPlayMode';\n")
             append("window.closeNpPref=$closeNowPlay;\n")
             append("window.__spotilolUseProxy=$useProxy;\n")
+            append("window.__splTakeControl=$takeControl;\n")
             if (prefs.getBoolean("DebugOverlay", false)) {
                 append(DevLogPrelude.js())
                 append("\n")
@@ -301,6 +303,11 @@ class SpotifyWebViewClient(
                 val css = prefs.getString("CustomCss", "") ?: ""
                 wv.evaluateJavascript(buildAmoledJs(amoled), null)
                 wv.evaluateJavascript(buildCustomCssJs(css), null)
+            }
+            if (key == "TakeControl"){
+                val wv = currentWebView ?: return@OnSharedPreferenceChangeListener
+                val on = prefs.getBoolean("TakeControl", true)
+                wv.evaluateJavascript("window.__splTakeControl=$on;", null)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
