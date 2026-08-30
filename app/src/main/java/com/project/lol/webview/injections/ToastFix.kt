@@ -70,7 +70,7 @@ object ToastFix {
                 '  margin-left:4px!important;',
                 '  transition:background .15s,transform .1s!important',
                 '}',
-                'div[role="alert"][aria-live] button:hover{background:rgba(29,185,84,.3)!important}',
+                'div[role="alert"][aria-live] button:hover{background:rgba(var(--spl-accent-rgb,29,185,84),.3)!important}',
                 'div[role="alert"][aria-live] button:active{transform:scale(.95)!important}',
                 '@keyframes splToastIn{',
                 '  0%{opacity:0;transform:translate(-50%,16px) scale(.94)}',

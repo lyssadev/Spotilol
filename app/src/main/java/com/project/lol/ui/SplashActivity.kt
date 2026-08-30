@@ -334,7 +334,7 @@ private fun CACertScreen(
                 onClick = onCheck,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF1DB954)
+                color = MaterialTheme.colorScheme.primary
             ) {
                 Box(
                     modifier = Modifier.padding(vertical = 14.dp),

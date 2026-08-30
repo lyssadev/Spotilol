@@ -5,15 +5,22 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaDescriptionCompat
@@ -21,6 +28,7 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.webkit.WebView
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.project.lol.R
@@ -28,9 +36,16 @@ import androidx.media.MediaBrowserServiceCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import androidx.media.session.MediaButtonReceiver
 import android.bluetooth.BluetoothDevice
-import android.media.AudioManager
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.IconCompat
+import androidx.core.graphics.scale
+import androidx.core.graphics.toColorInt
+import com.project.lol.webview.helpers.AccentTheme
+import java.lang.ref.WeakReference
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.Executors
 import kotlin.math.min
 
 class MediaNotificationService : MediaBrowserServiceCompat() {
@@ -39,6 +54,7 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         private const val TAG = "MediaNotifService"
         private const val CHANNEL_ID = "spotilol_media_playback"
         private const val NOTIFICATION_ID = 1
+        private val mainHandler = Handler(Looper.getMainLooper())
         private const val MEDIA_ID_ROOT = "__ROOT__"
 
         const val ACTION_PLAY_PAUSE = "com.project.lol.ACTION_PLAY_PAUSE"
@@ -121,8 +137,15 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
 
     private var lastMediaStatusJson: String? = null
     private var firstHeadsetCallback = true
+    private var accentCache = 0
 
-    private val prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "PaletteSeed" || key == "MaterialYou") {
+            accentCache = 0
+            mainHandler.post {
+                showNotification()
+            }
+        }
         if (key == "AndAuto") {
             val andAuto = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
                 .getBoolean("AndAuto", true)
@@ -156,6 +179,28 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
                 }
             }
         }
+    }
+
+    private fun accent(): Int {
+        if (accentCache == 0) {
+            accentCache = try {
+                AccentTheme.resolveHex(this).toColorInt()
+            } catch (_: Exception) {
+                0xFFE0E0E0.toInt()
+            }
+        }
+        return accentCache
+    }
+
+    private fun tintedIcon(resId: Int): IconCompat {
+        val d = AppCompatResources.getDrawable(this, resId)!!.mutate()
+        d.setTint(accent())
+        val bmp = createBitmap(d.intrinsicWidth, d.intrinsicHeight)
+        Canvas(bmp).also { canvas ->
+            d.setBounds(0, 0, bmp.width, bmp.height)
+            d.draw(canvas)
+        }
+        return IconCompat.createWithBitmap(bmp)
     }
 
     override fun onCreate() {
@@ -564,25 +609,27 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         )
 
         val prevAction = NotificationCompat.Action.Builder(
-            R.drawable.ic_skip_prev, "Previous", getActionPendingIntent(ACTION_PREV)
+            tintedIcon(R.drawable.ic_skip_prev), "Previous", getActionPendingIntent(ACTION_PREV)
         ).build()
 
         val playPauseAction = NotificationCompat.Action.Builder(
-            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
+            tintedIcon(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
             if (isPlaying) "Pause" else "Play",
             getActionPendingIntent(ACTION_PLAY_PAUSE)
         ).build()
 
         val nextAction = NotificationCompat.Action.Builder(
-            R.drawable.ic_skip_next, "Next", getActionPendingIntent(ACTION_NEXT)
+            tintedIcon(R.drawable.ic_skip_next), "Next", getActionPendingIntent(ACTION_NEXT)
         ).build()
 
         val shuffleAction = NotificationCompat.Action.Builder(
-            when {
-                isSmartShuffle -> R.drawable.ic_shuffle_smart_active
-                isShuffle -> R.drawable.ic_shuffle_active
-                else -> R.drawable.ic_shuffle
-            },
+            tintedIcon(
+                when {
+                    isSmartShuffle -> R.drawable.ic_shuffle_smart_active
+                    isShuffle -> R.drawable.ic_shuffle_active
+                    else -> R.drawable.ic_shuffle
+                }
+            ),
             when {
                 isSmartShuffle -> "Disable smart shuffle"
                 isShuffle -> "Disable shuffle"
@@ -592,7 +639,7 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         ).build()
 
         val favAction = NotificationCompat.Action.Builder(
-            if (isFavorite) R.drawable.ic_favorite_filled else R.drawable.ic_favorite,
+            tintedIcon(if (isFavorite) R.drawable.ic_favorite_filled else R.drawable.ic_favorite),
             if (isFavorite) "Unlike" else "Like",
             getActionPendingIntent(ACTION_FAVORITE)
         ).build()
@@ -614,7 +661,7 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setShowWhen(false)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setColor(NOTIF_COLOR)
+            .setColor(accent())
             .setStyle(buildMediaStyle(isShuffleAvailable))
         actions.forEach { builder.addAction(it) }
 

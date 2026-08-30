@@ -283,6 +283,7 @@ class SpotifyWebViewClient(
         }
         val cleanJs = JsUtils.stripConsoleLogs(js) + "\n" +
                 buildAmoledJs(amoledEnabled) + "\n" +
+                AccentTheme.buildAccentJs(view.context) + "\n" +
                 buildCustomCssJs(customCss)
         if (playerMode == "original") {
             view.evaluateJavascript(cleanJs + "\n(function(){var s=document.createElement('style');s.id='spl-np-show';s.textContent='aside[data-testid=\"now-playing-bar\"]{display:flex!important}';document.head.appendChild(s);})();", null)
@@ -309,6 +310,10 @@ class SpotifyWebViewClient(
                 val css = prefs.getString("CustomCss", "") ?: ""
                 wv.evaluateJavascript(buildAmoledJs(amoled), null)
                 wv.evaluateJavascript(buildCustomCssJs(css), null)
+            }
+            if (key == "PaletteSeed" || key == "MaterialYou") {
+                val wv = currentWebView ?: return@OnSharedPreferenceChangeListener
+                wv.evaluateJavascript(AccentTheme.buildAccentJs(wv.context), null)
             }
             if (key == "TakeControl"){
                 val wv = currentWebView ?: return@OnSharedPreferenceChangeListener
