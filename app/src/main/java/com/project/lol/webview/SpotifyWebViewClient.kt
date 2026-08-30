@@ -74,6 +74,9 @@ class SpotifyWebViewClient(
             ?.getString("ConnectionMode", "normal") == "proxy"
         val powerSave = view?.context?.getSharedPreferences("spotilol_prefs", 0)
             ?.getBoolean("PowerSave", false) ?: false
+        val blockSW = view?.context?.getSharedPreferences("spotilol_prefs", 0)
+            ?.getBoolean("BlockServiceWorker", true) ?: true
+
         view?.evaluateJavascript("window.__spotilolUseProxy=$useProxy;", null)
         if (isGoogleAuthUrl(url)) {
             view?.evaluateJavascript(GoogleSpoof.CONTENT, null)
@@ -83,10 +86,12 @@ class SpotifyWebViewClient(
         view?.evaluateJavascript(FetchOverride.CONTENT, null)
         AdIdStore.clear()
         view?.evaluateJavascript(AdStateHook.CONTENT, null)
+        if (blockSW) view?.evaluateJavascript(WorkerNeutralize.CONTENT, null)
         view?.evaluateJavascript(GaBlocker.CONTENT, null)
         view?.evaluateJavascript("window.__splPowerSavePref=$powerSave;", null)
         view?.evaluateJavascript(PowerSave.CONTENT, null)
         view?.evaluateJavascript(SettingsFix.CONTENT, null)
+        view?.evaluateJavascript(VideoPark.CONTENT, null)
     }
 
     override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
@@ -308,6 +313,24 @@ class SpotifyWebViewClient(
                 val wv = currentWebView ?: return@OnSharedPreferenceChangeListener
                 val on = prefs.getBoolean("TakeControl", true)
                 wv.evaluateJavascript("window.__splTakeControl=$on;", null)
+            }
+            if (key == "BlockServiceWorker") {
+                val wv = currentWebView ?: return@OnSharedPreferenceChangeListener
+                val enabled = prefs.getBoolean("BlockServiceWorker", true)
+                if (enabled) {
+                    wv.evaluateJavascript(WorkerNeutralize.CONTENT, null)
+                    wv.evaluateJavascript("""
+                        try {
+                            if(navigator.serviceWorker){
+                                navigator.serviceWorker.getRegistrations().then(function(regs){
+                                    regs.forEach(function(r){ r.unregister(); });
+                                });
+                            }
+                        } catch(e){}
+                    """.trimIndent(), null)
+                } else {
+                    wv.reload()
+                }
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)

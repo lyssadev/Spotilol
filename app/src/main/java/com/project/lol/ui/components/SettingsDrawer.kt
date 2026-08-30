@@ -66,6 +66,8 @@ fun SettingsDrawer(
     onClearCache: () -> Unit,
     onClearData: () -> Unit,
     onDebugToggle: (Boolean) -> Unit = {},
+    blockServiceWorker: Boolean,
+    onBlockServiceWorkerChange: (Boolean) -> Unit,
     content: @Composable () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -114,7 +116,9 @@ fun SettingsDrawer(
                             onDeleteProfile = onDeleteProfile,
                             onClearCache = onClearCache,
                             onClearData = onClearData,
-                            onDebugToggle = onDebugToggle
+                            onDebugToggle = onDebugToggle,
+                            blockServiceWorker = blockServiceWorker,
+                            onBlockServiceWorkerChange = onBlockServiceWorkerChange
                         )
                     }
                 }

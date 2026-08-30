@@ -172,7 +172,9 @@ fun SettingsContent(
     onDeleteProfile: (String) -> Unit,
     onClearCache: () -> Unit,
     onClearData: () -> Unit,
-    onDebugToggle: (Boolean) -> Unit = {}
+    onDebugToggle: (Boolean) -> Unit = {},
+    blockServiceWorker: Boolean,
+    onBlockServiceWorkerChange: (Boolean) -> Unit,
 ) {
     var autoplayMode by remember { mutableStateOf(prefs.getString("APlayMode", "disabled") ?: "disabled") }
     var takeControl by remember { mutableStateOf(prefs.getBoolean("TakeControl", true)) }
@@ -187,6 +189,8 @@ fun SettingsContent(
     var playerMode by remember { mutableStateOf(prefs.getString("PlayerMode", "spotilol") ?: "spotilol") }
     var connectionMode by remember { mutableStateOf(prefs.getString("ConnectionMode", "normal") ?: "normal") }
     var offlineMode by remember { mutableStateOf(prefs.getBoolean("OfflineMode", false)) }
+    var powerSave by remember { mutableStateOf(prefs.getBoolean("PowerSave", false)) }
+    var blockSW by remember { mutableStateOf(blockServiceWorker) }
 
     val context = LocalContext.current
     var profiles by remember { mutableStateOf(ProfileManager.getProfiles(context)) }
@@ -406,6 +410,19 @@ fun SettingsContent(
                 onCheckedChange = { enabled ->
                     offlineMode = enabled
                     onOfflineModeChange(enabled)
+                }
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+
+            SettingSwitchTile(
+                title = "Block Service Worker",
+                subtitle = "Prevent Spotify's SW from intercepting requests",
+                icon = Icons.Default.Shield,
+                checked = blockSW,
+                onCheckedChange = { enabled ->
+                    blockSW = enabled
+                    onBlockServiceWorkerChange(enabled)
                 }
             )
         }
@@ -1602,4 +1619,39 @@ fun DevlogLiveDialog(onDismiss: () -> Unit) {
             }
         }
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SettingsContentPreview() {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("preview_prefs", Context.MODE_PRIVATE) }
+    SpotifyTheme {
+        SettingsContent(
+            modifier = Modifier.fillMaxSize(),
+            prefs = prefs,
+            materialYou = false,
+            onMaterialYouChange = {},
+            amoledThemeState = false,
+            onAmoledThemeChange = {},
+            hideTopBar = false,
+            onHideTopBarChange = {},
+            landscapeMode = false,
+            onLandscapeModeChange = {},
+            keepScreenOn = false,
+            onKeepScreenOnChange = {},
+            paletteSeed = null,
+            onPaletteSeedChange = {},
+            onConnectionModeChange = {},
+            onOfflineModeChange = {},
+            onSaveProfile = { _, _ -> },
+            onLoadProfile = {},
+            onDeleteProfile = {},
+            onClearCache = {},
+            onClearData = {},
+            onDebugToggle = {},
+            blockServiceWorker = true,
+            onBlockServiceWorkerChange = {},
+        )
+    }
 }

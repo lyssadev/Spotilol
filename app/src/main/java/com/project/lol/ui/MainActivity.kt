@@ -162,6 +162,7 @@ class MainActivity : ComponentActivity() {
     private val sleepTimerActive = mutableStateOf(false)
 
     private val loadingProgress = mutableIntStateOf(100)
+    private val blockServiceWorkerState = mutableStateOf(true)
     private val webViewError = mutableStateOf<Pair<Int, String>?>(null)
 
     private val notifPermLauncher = registerForActivityResult(
@@ -221,6 +222,7 @@ class MainActivity : ComponentActivity() {
         landscapeModeState.value = prefs.getBoolean("LandscapeMode", false)
         keepScreenOnState.value = prefs.getBoolean("KeepScreenOn", false)
         paletteSeedState.value = prefs.getString("PaletteSeed", null)
+        blockServiceWorkerState.value = prefs.getBoolean("BlockServiceWorker", true)
         applyOrientation()
         applyKeepScreenOn()
 
@@ -235,6 +237,7 @@ class MainActivity : ComponentActivity() {
             val showDialog = showSleepTimerDialog.value
             val timerActive = sleepTimerActive.value
             val loadProgress = loadingProgress.intValue
+            val blockServiceWorker = blockServiceWorkerState.value
 
             var settingsDrawerOpen by remember { mutableStateOf(false) }
             var showMiniMenu by remember { mutableStateOf(false) }
@@ -308,7 +311,12 @@ class MainActivity : ComponentActivity() {
                             else "window.dbg=null;window.dbgw=null;window.dbge=null;window.DevLog=null;",
                             null
                         )
-                    }
+                    },
+                    blockServiceWorker = blockServiceWorker,
+                    onBlockServiceWorkerChange = { enabled ->
+                        blockServiceWorkerState.value = enabled
+                        prefs.edit { putBoolean("BlockServiceWorker", enabled) }
+                    },
                 ) {
                     Scaffold(
                         topBar = {
@@ -1299,6 +1307,7 @@ class MainActivity : ComponentActivity() {
         landscapeModeState.value = prefs.getBoolean("LandscapeMode", false)
         keepScreenOnState.value = prefs.getBoolean("KeepScreenOn", false)
         paletteSeedState.value = prefs.getString("PaletteSeed", null)
+        blockServiceWorkerState.value = prefs.getBoolean("BlockServiceWorker", true)
         applyOrientation()
         applyKeepScreenOn()
 
