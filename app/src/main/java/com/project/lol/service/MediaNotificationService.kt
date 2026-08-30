@@ -63,6 +63,9 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
 
         var webView: WebView? = null
         var instance: MediaNotificationService? = null
+
+        @Volatile
+        private var taskRemoved = false
     }
 
     private lateinit var mediaSession: MediaSessionCompat
@@ -184,6 +187,10 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (taskRemoved) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         try {
             ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotificationSafe(), getStartForegroundServiceType())
         } catch (e: Throwable) {
@@ -194,7 +201,7 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to handle media button intent", e)
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onGetRoot(
@@ -242,8 +249,14 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(prefsListener)
         if (::mediaSession.isInitialized) {
+            try { mediaSession.isActive = false } catch (_: Exception) {}
             try { mediaSession.release() } catch (_: Exception) {}
         }
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            getSystemService(NotificationManager::class.java)
+                .cancel(NOTIFICATION_ID)
+        } catch (_: Exception) {}
         super.onDestroy()
     }
 
@@ -627,10 +640,15 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         val stopOnSwipe = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
             .getBoolean("SwipeStop", true)
         if (stopOnSwipe) {
+            taskRemoved = true
             if (::mediaSession.isInitialized) {
                 try { mediaSession.isActive = false } catch (_: Exception) {}
             }
             releaseWakeLock()
+            try {
+                getSystemService(NotificationManager::class.java)
+                    .cancel(NOTIFICATION_ID)
+            } catch (_: Exception) {}
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
