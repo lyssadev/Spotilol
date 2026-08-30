@@ -120,6 +120,7 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
     }
 
     private var lastMediaStatusJson: String? = null
+    private var firstHeadsetCallback = true
 
     private val prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "AndAuto") {
@@ -136,6 +137,22 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
                     updatePlaybackState()
                     updateMetadata()
                     showNotification()
+                }
+            }
+        }
+    }
+
+    private val headsetReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_HEADSET_PLUG) {
+                val state = intent.getIntExtra("state", -1)
+                if (firstHeadsetCallback) {
+                    firstHeadsetCallback = false
+                    return
+                }
+                if (state == 1) {
+                    val prefs = getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
+                    if (prefs.getBoolean("HpAutoResume", false)) resumePlayback()
                 }
             }
         }
@@ -246,6 +263,7 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         try { unregisterReceiver(actionReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(bluetoothReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(audioBecomingNoisyReceiver) } catch (_: Exception) {}
+        try { unregisterReceiver(headsetReceiver) } catch (_: Exception) {}
         getSharedPreferences("spotilol_prefs", MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(prefsListener)
         if (::mediaSession.isInitialized) {
@@ -353,6 +371,9 @@ class MediaNotificationService : MediaBrowserServiceCompat() {
         } else {
             registerReceiver(bluetoothReceiver, btFilter)
         }
+
+        val hsFilter = IntentFilter(Intent.ACTION_HEADSET_PLUG)
+        ContextCompat.registerReceiver(this, headsetReceiver, hsFilter, ContextCompat.RECEIVER_EXPORTED)
     }
 
     private fun pausePlayback() {

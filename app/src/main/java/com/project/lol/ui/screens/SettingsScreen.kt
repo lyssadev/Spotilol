@@ -186,6 +186,7 @@ fun SettingsContent(
     var swipeStop by remember { mutableStateOf(prefs.getBoolean("SwipeStop", true)) }
     var btAutoPause by remember { mutableStateOf(prefs.getBoolean("BtAutoPause", false)) }
     var btAutoResume by remember { mutableStateOf(prefs.getBoolean("BtAutoResume", false)) }
+    var hpAutoResume by remember { mutableStateOf(prefs.getBoolean("HpAutoResume", false)) }
     var playerMode by remember { mutableStateOf(prefs.getString("PlayerMode", "spotilol") ?: "spotilol") }
     var connectionMode by remember { mutableStateOf(prefs.getString("ConnectionMode", "normal") ?: "normal") }
     var offlineMode by remember { mutableStateOf(prefs.getBoolean("OfflineMode", false)) }
@@ -452,6 +453,19 @@ fun SettingsContent(
                 onCheckedChange = {
                     btAutoResume = it
                     prefs.edit().putBoolean("BtAutoResume", it).apply()
+                }
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+
+            SettingSwitchTile(
+                title = "Resume on Headphone Plug",
+                subtitle = "Resume when wired headphones connect",
+                icon = Icons.Default.Smartphone,
+                checked = hpAutoResume,
+                onCheckedChange = {
+                    hpAutoResume = it
+                    prefs.edit { putBoolean("HpAutoResume", it) }
                 }
             )
         }
