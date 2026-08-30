@@ -1313,6 +1313,11 @@ class MainActivity : ComponentActivity() {
                     if(window.__splWasPfint) { window.__splWasPfint = false; firstFuck(); }
                     if(window.__splWasAfint) { window.__splWasAfint = false; addAutoFeatures(); }
                     if(window.__splWasCssint) { window.__splWasCssint = false; addCSSJSHack(); }
+                    if(window.autoPlayMode === 'onetime') {
+                        window.__splApDone = false;
+                        window.__splApActive = false;
+                        if(typeof splAutoPlay === 'function') splAutoPlay();
+                    }
                 } catch(e) {}
             """.trimIndent(), null)
 
