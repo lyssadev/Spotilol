@@ -1,6 +1,5 @@
 package com.project.lol.ui.screens
 
-import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
@@ -9,8 +8,6 @@ import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.core.content.ContextCompat
-import com.project.lol.service.OfflineMediaService
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -48,11 +45,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -91,14 +88,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
+import androidx.core.content.ContextCompat
 import com.project.lol.R
 import com.project.lol.offline.OfflineSong
 import com.project.lol.offline.OfflineStore
+import com.project.lol.service.OfflineMediaService
 import com.project.lol.ui.components.SettingsDrawer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -273,7 +273,7 @@ fun OfflineScreen(
         while (isPlaying) {
             runCatching { positionMs = mediaPlayer.currentPosition }
             OfflineMediaService.instance?.updatePosition(positionMs.toLong())
-            delay(500)
+            delay(500.milliseconds)
         }
     }
 
@@ -299,7 +299,12 @@ fun OfflineScreen(
         onLoadProfile = onLoadProfile,
         onDeleteProfile = onDeleteProfile,
         onClearCache = onClearCache,
-        onClearData = onClearData
+        onClearData = onClearData,
+        onDebugToggle = {},
+        blockServiceWorker = prefs.getBoolean("BlockServiceWorker", true),
+        onBlockServiceWorkerChange = { enabled ->
+            prefs.edit().putBoolean("BlockServiceWorker", enabled).apply()
+        }
     ) {
         Scaffold(
             modifier = modifier,

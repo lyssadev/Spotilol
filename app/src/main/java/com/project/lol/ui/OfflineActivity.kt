@@ -104,10 +104,12 @@ class OfflineActivity : ComponentActivity() {
                         Toast.makeText(this, "Account saved", Toast.LENGTH_SHORT).show()
                     },
                     onLoadProfile = { cookies ->
-                        if (!ProfileManager.applyProfile(this, cookies)) {
-                            Toast.makeText(this, "Profile could not be loaded", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(this, "Profile loaded", Toast.LENGTH_SHORT).show()
+                        ProfileManager.applyProfile(this, cookies) { success ->
+                            if (success) {
+                                Toast.makeText(this, "Profile loaded", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(this, "Profile could not be loaded", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
                     onDeleteProfile = { name ->
