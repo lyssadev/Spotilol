@@ -18,6 +18,7 @@ package com.project.lol.webview.injections
  * blob: URLs (MediaSource) can't be re-attached after load(), so
  * those are left alone.
  */
+
 object VideoPark {
     const val CONTENT = """
         (function(){
@@ -45,7 +46,7 @@ object VideoPark {
                         var src = v.currentSrc || v.getAttribute('src') || '';
                         /* blob: = MediaSource, can't be re-attached after load().
                            Leave those alone rather than strand them. */
-                        if(!src || src.indexOf('blob:') === 0) continue;
+                        if(!src || src.startsWith('blob:')) continue;
                         v.__splParked = true;
                         parked.push({el:v, src:src, t:(v.currentTime||0), playing:(!v.paused && !v.ended)});
                         try{ v.pause(); }catch(e){}
@@ -73,12 +74,12 @@ object VideoPark {
                             v.currentTime = b.t || 0;
                             if(b.playing){
                                 var p = v.play();
-                                if(p && p.catch) p.catch(function(){});
+                                if(p) p.catch(function(){});
                             }
                         }catch(e){}
                         v.__splParked = false;
                     }
-                    parked = [];
+                    parked.length = 0;
                     try{ AndBridge.dbg('s','videos restored from background park'); }catch(e){}
                 };
 

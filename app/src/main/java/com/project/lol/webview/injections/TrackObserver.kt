@@ -37,12 +37,16 @@ object TrackObserver {
                 };
             };
 
-            let root = null, anchor = null, last = null, lastFiberAt = 0, watchdog = null;
+            let root = null, anchor = null, last = null, lastFiberAt = 0, watchdog = null, fiberKey = null;
 
             function currentId() {
                 if (!root) return null;
                 if (!anchor || !anchor.isConnected) anchor = root.querySelector(LINK);
-                return anchor && anchor.href ? (anchor.href.match(ID_RE) || [])[1] || null : null;
+                if (!anchor) return null;
+                const href = anchor.getAttribute('href');
+                if (!href) return null;
+                const m = ID_RE.exec(href);
+                return m ? m[1] : null;
             }
 
             function uriFromProps(p) {
@@ -57,9 +61,12 @@ object TrackObserver {
 
             function fiberURI() {
                 if (!root) return null;
-                const fk = Object.keys(root).find(k => k.startsWith(FIBER));
-                if (!fk) return null;
-                const f = root[fk];
+                if (!fiberKey) {
+                    fiberKey = Object.keys(root).find(k => k.startsWith(FIBER));
+                    if (!fiberKey) return null;
+                }
+                const f = root[fiberKey];
+                if (!f) return null;
 
                 const stack = [f];
                 while (stack.length) {
@@ -86,8 +93,9 @@ object TrackObserver {
                 window.splTrackUri = uri;
                 try{ AndBridge.dbg('s','[track] ' + uri + ' (' + via + ')'); }catch(e){}
                 window.dispatchEvent(new CustomEvent('trackchange', { detail: uri }));
-                for(var i = 0; i < window.__splTrackListeners.length; i++){
-                    try{ window.__splTrackListeners[i](uri, id); }catch(e){}
+                const listeners = window.__splTrackListeners;
+                for(var i = 0; i < listeners.length; i++){
+                    try{ listeners[i](uri, id); }catch(e){}
                 }
             }
 
@@ -106,7 +114,7 @@ object TrackObserver {
             const obs = new MutationObserver(check);
 
             function attach(el) {
-                root = el; anchor = null;
+                root = el; anchor = null; fiberKey = null;
                 obs.disconnect();
                 obs.observe(el, {
                     subtree: true,
@@ -114,11 +122,15 @@ object TrackObserver {
                     attributes: true,
                     attributeFilter: ['href']
                 });
-                const id = currentId() || (fiberURI() ? fiberURI().split(':').pop() : null);
+                let id = currentId();
+                if (!id) {
+                    const uri = fiberURI();
+                    if (uri) id = uri.split(':').pop();
+                }
                 if (id) emit(id, 'init');
             }
 
-            function detach() { obs.disconnect(); root = anchor = null; }
+            function detach() { obs.disconnect(); root = anchor = fiberKey = null; }
 
             function stop() {
                 detach();

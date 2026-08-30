@@ -29,20 +29,21 @@ object GaBlocker {
             var ga = function(){
                 var len = arguments.length;
                 if (len === 0) return;
-                var args = Array.from(arguments);
+                var a = arguments[len-1];
                 var fn;
-                var a = args[len-1];
-                if (a instanceof Object && a.hitCallback instanceof Function) {
+                if (a && typeof a === 'object' && typeof a.hitCallback === 'function') {
                     fn = a.hitCallback;
-                } else if (a instanceof Function) {
+                } else if (typeof a === 'function') {
                     fn = function(){ a(ga.create()); };
                 } else {
-                    var pos = args.indexOf('hitCallback');
-                    if (pos !== -1 && args[pos+1] instanceof Function) {
-                        fn = args[pos+1];
+                    for (var i = 0; i < len; i++) {
+                        if (arguments[i] === 'hitCallback' && i+1 < len && typeof arguments[i+1] === 'function') {
+                            fn = arguments[i+1];
+                            break;
+                        }
                     }
                 }
-                if (fn instanceof Function === false) return;
+                if (typeof fn !== 'function') return;
                 try { fn(); } catch(ex){}
             };
             ga.create = function(){ return new Tracker(); };
@@ -53,24 +54,23 @@ object GaBlocker {
             w[gaName] = ga;
 
             var dl = w.dataLayer;
-            if (dl instanceof Object) {
-                if (dl.hide instanceof Object && typeof dl.hide.end === 'function') {
+            if (dl && typeof dl === 'object') {
+                if (dl.hide && typeof dl.hide.end === 'function') {
                     dl.hide.end();
                     dl.hide.end = function(){};
                 }
                 if (typeof dl.push === 'function') {
                     var doCallback = function(item){
-                        if (item instanceof Object === false) return;
+                        if (!item || typeof item !== 'object') return;
                         if (typeof item.eventCallback !== 'function') return;
                         setTimeout(item.eventCallback, 1);
                         item.eventCallback = function(){};
                     };
-                    dl.push = new Proxy(dl.push, {
-                        apply: function(target, thisArg, args){
-                            doCallback(args[0]);
-                            return Reflect.apply(target, thisArg, args);
-                        }
-                    });
+                    var originalPush = dl.push;
+                    dl.push = function(){
+                        doCallback(arguments[0]);
+                        return originalPush.apply(this, arguments);
+                    };
                     if (Array.isArray(dl)) {
                         var q = dl.slice();
                         for (var i = 0; i < q.length; i++) {
@@ -80,7 +80,7 @@ object GaBlocker {
                 }
             }
 
-            if (gaQueue instanceof Function && Array.isArray(gaQueue.q)) {
+            if (typeof gaQueue === 'function' && Array.isArray(gaQueue.q)) {
                 var q2 = gaQueue.q.slice();
                 gaQueue.q.length = 0;
                 for (var j = 0; j < q2.length; j++) {

@@ -41,9 +41,10 @@ object AdStateHook {
             var lastPub = '';
             var dirty = false;
             var textDecoder = null;
+            var ID_RE = /^[a-zA-Z0-9_-]{8,128}$/;
 
             function safeId(v){
-                return typeof v === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(v);
+                return typeof v === 'string' && ID_RE.test(v);
             }
             function remember(v){
                 if (!safeId(v) || knownIds[v]) return;
@@ -105,7 +106,6 @@ object AdStateHook {
                     remember(t.file_id);
                     remember(t.fileId);
                 }
-                publish();
             }
             function inspectStateMachine(sm){
                 if (!sm || typeof sm !== 'object') return;
@@ -126,6 +126,7 @@ object AdStateHook {
                         }
                     }
                 }
+                publish();
             }
             function parseJson(v){
                 if (typeof v !== 'string' || v.length > MAX_JSON) return null;
@@ -168,7 +169,7 @@ object AdStateHook {
                             Promise.resolve(p).then(function(res){
                                 try {
                                     var c = res.clone();
-                                    Promise.resolve(c.json()).then(inspectPayload).catch(function(){});
+                                    c.json().then(inspectPayload).catch(function(){});
                                 } catch(e){}
                             }).catch(function(){});
                         }
