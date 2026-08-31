@@ -180,4 +180,38 @@ object OfflineStore {
         removeMetadata(context, song.id)
         return ok
     }
+
+    /**
+     * TRUE if a track with this Spotify ID is already saved in Music/Spotilol.
+     * Used to de-duplicate album/playlist batch downloads. MediaStore is the
+     * source of truth on Q+; the folder listing on older devices.
+     */
+    fun isTrackSaved(context: Context, trackId: String): Boolean {
+        if (trackId.isBlank()) return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val escaped = trackId
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            runCatching {
+                context.contentResolver.query(
+                    MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL),
+                    arrayOf(MediaStore.Audio.Media._ID),
+                    "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ? AND " +
+                            "${MediaStore.Audio.Media.DISPLAY_NAME} LIKE ? ESCAPE '\\'",
+                    arrayOf("%Music/$FOLDER%", "%[$escaped]%"),
+                    null,
+                )?.use { it.count > 0 } ?: false
+            }.getOrDefault(false)
+        } else {
+            val dir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+                FOLDER,
+            )
+            val marker = "[$trackId]."
+            runCatching {
+                dir.listFiles()?.any { it.isFile && it.name.contains(marker) } == true
+            }.getOrDefault(false)
+        }
+    }
 }

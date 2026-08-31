@@ -396,18 +396,16 @@ class MainActivity : ComponentActivity() {
 
                             bridge.onDownloadTrack = { payload ->
                                 Log.d("Spl-DL", "bridge.onDownloadTrack: payload=$payload")
-                                DownloadManager.onStatus = { msg ->
-                                    runOnUiThread {
-                                        Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                                DownloadManager.onProgress = { pct, label ->
-                                    runOnUiThread {
-                                        val safe = label.replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ")
-                                        webView?.evaluateJavascript("window.splDownloadProgress($pct, '$safe')", null)
-                                    }
-                                }
+                                wireDownloadCallbacks()
+                                startDownloadService()
                                 DownloadManager.downloadCurrentTrack(this@MainActivity, payload)
+                            }
+
+                            bridge.onDownloadCollection = { payload ->
+                                Log.d("Spl-DL", "bridge.onDownloadCollection: payload=${payload.take(300)}")
+                                wireDownloadCallbacks()
+                                startDownloadService()
+                                DownloadManager.downloadCollection(this@MainActivity, payload)
                             }
 
 
@@ -1189,6 +1187,32 @@ class MainActivity : ComponentActivity() {
                 try { conn?.disconnect() } catch (_: Exception) {}
             }
         }.start()
+    }
+
+    private fun wireDownloadCallbacks() {
+        DownloadManager.onStatus = { msg ->
+            runOnUiThread {
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+            }
+        }
+        DownloadManager.onProgress = { pct, label ->
+            runOnUiThread {
+                val safe = label.replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ")
+                val batch = DownloadManager.isBatchActive()
+                webView?.evaluateJavascript(
+                    "window.__splDlBatch=$batch;window.splDownloadProgress($pct, '$safe')",
+                    null
+                )
+            }
+        }
+    }
+
+    private fun startDownloadService() {
+        runCatching {
+            ContextCompat.startForegroundService(
+                this, Intent(this, com.project.lol.service.DownloadService::class.java)
+            )
+        }
     }
 
     private fun destroyWebView() {

@@ -249,6 +249,7 @@ class SpotifyWebViewClient(
             append(SearchOverlay.CONTENT)
             append(DownloadButton.CONTENT)
             append(DownloadProgress.CONTENT)
+            append(CollectionDownload.CONTENT)
             append("""
                 (function(){
                     var recAcc=function(){
