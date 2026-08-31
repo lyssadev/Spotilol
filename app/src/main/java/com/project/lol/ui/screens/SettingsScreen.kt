@@ -192,6 +192,7 @@ fun SettingsContent(
     var offlineMode by remember { mutableStateOf(prefs.getBoolean("OfflineMode", false)) }
     var powerSave by remember { mutableStateOf(prefs.getBoolean("PowerSave", false)) }
     var blockSW by remember { mutableStateOf(blockServiceWorker) }
+    var hideEmptyPlayer by remember { mutableStateOf(prefs.getBoolean("HideEmptyPlayer", false)) }
 
     val context = LocalContext.current
     var profiles by remember { mutableStateOf(ProfileManager.getProfiles(context)) }
@@ -353,6 +354,19 @@ fun SettingsContent(
                 subtitle = playerModeLabel,
                 icon = Icons.Default.PlayCircle,
                 onClick = { showPlayerModeDialog = true }
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+
+            SettingSwitchTile(
+                title = "Hide Empty Mini Player",
+                subtitle = "Hide the mini player until a track is loaded",
+                icon = Icons.Default.VisibilityOff,
+                checked = hideEmptyPlayer,
+                onCheckedChange = {
+                    hideEmptyPlayer = it
+                    prefs.edit().putBoolean("HideEmptyPlayer", it).apply()
+                }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))

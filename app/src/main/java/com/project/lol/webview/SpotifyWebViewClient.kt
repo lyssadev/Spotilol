@@ -70,14 +70,18 @@ class SpotifyWebViewClient(
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
-        val useProxy = view?.context?.getSharedPreferences("spotilol_prefs", 0)
-            ?.getString("ConnectionMode", "normal") == "proxy"
-        val powerSave = view?.context?.getSharedPreferences("spotilol_prefs", 0)
-            ?.getBoolean("PowerSave", false) ?: false
-        val blockSW = view?.context?.getSharedPreferences("spotilol_prefs", 0)
-            ?.getBoolean("BlockServiceWorker", true) ?: true
+        val prefs = view?.context?.getSharedPreferences("spotilol_prefs", 0)
+
+        val useProxy = prefs?.getString("ConnectionMode", "normal") == "proxy"
+        val powerSave = prefs?.getBoolean("PowerSave", false) ?: false
+        val blockSW = prefs?.getBoolean("BlockServiceWorker", true) ?: true
+        val hideEmptyPlayer = prefs?.getBoolean("HideEmptyPlayer", false) ?: false
 
         view?.evaluateJavascript("window.__spotilolUseProxy=$useProxy;", null)
+        view?.evaluateJavascript("window.__splPowerSavePref=$powerSave;", null)
+        view?.evaluateJavascript("window.__splHideEmpty=$hideEmptyPlayer;", null)
+        // FIX: these payloads were injected raw - strip them like every other
+        // injection, served from cache.
         if (isGoogleAuthUrl(url)) {
             view?.evaluateJavascript(GoogleSpoof.CONTENT, null)
         } else {
@@ -232,14 +236,17 @@ class SpotifyWebViewClient(
         val customCss = prefs.getString("CustomCss", "") ?: ""
         val playerMode = prefs.getString("PlayerMode", "spotilol") ?: "spotilol"
         val useProxy = prefs.getString("ConnectionMode", "normal") == "proxy"
+        val debugOverlay = prefs.getBoolean("DebugOverlay", false)
         val takeControl = prefs.getBoolean("TakeControl", true)
+        val hideEmptyPlayer = prefs.getBoolean("HideEmptyPlayer", false)
 
         val js = buildString {
             append("window.autoPlayMode='$autoPlayMode';\n")
             append("window.closeNpPref=$closeNowPlay;\n")
             append("window.__spotilolUseProxy=$useProxy;\n")
             append("window.__splTakeControl=$takeControl;\n")
-            if (prefs.getBoolean("DebugOverlay", false)) {
+            append("window.__splHideEmpty=$hideEmptyPlayer;\n")
+            if (debugOverlay) {
                 append(DevLogPrelude.js())
                 append("\n")
             }
@@ -380,5 +387,15 @@ class SpotifyWebViewClient(
         private const val TAG = "SpotifyWebViewClient"
         private const val DESKTOP_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+
+        private val SW_UNREGISTER_JS = """
+            try {
+                if(navigator.serviceWorker){
+                    navigator.serviceWorker.getRegistrations().then(function(regs){
+                        regs.forEach(function(r){ r.unregister(); });
+                    });
+                }
+            } catch(e){}
+        """.trimIndent()
     }
 }
