@@ -12,7 +12,7 @@ object DownloadProgress {
                     var el = document.createElement('div');
                     el.id = 'spl-dl-progress';
                     el.innerHTML = '<div id="spl-dl-label" style="color:#fff;font-size:11px;font-weight:600;font-family:-apple-system,Roboto,sans-serif;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>' +
-                        '<div style="height:3px;background:rgba(255,255,255,0.14);border-radius:2px;overflow:hidden;"><div id="spl-dl-fill" style="height:100%;width:0%;background:#1DB954;border-radius:2px;transition:width 0.2s linear;"></div></div>';
+                        '<div style="height:3px;background:rgba(255,255,255,0.14);border-radius:2px;overflow:hidden;"><div id="spl-dl-fill" style="height:100%;width:0%;background:var(--spl-accent,#1DB954);border-radius:2px;transition:width 0.2s linear;"></div></div>';
                     el.style.cssText = 'position:absolute;bottom:100%;left:0;right:0;margin-bottom:8px;background:rgba(24,24,24,0.97);border:1px solid rgba(255,255,255,0.1);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.5);padding:8px 12px;opacity:0;transform:translateY(14px);transition:opacity 0.22s ease, transform 0.22s ease;pointer-events:none;display:none;z-index:1;';
                     player.insertBefore(el, player.firstChild);
                     return el;
@@ -54,12 +54,12 @@ object DownloadProgress {
                         dlHideTimer = setTimeout(popOut, 4000);
                     } else if(pct >= 100){
                         fillEl.style.width = '100%';
-                        fillEl.style.background = '#1DB954';
+                        fillEl.style.background = 'var(--spl-accent,#1DB954)';
                         popIn();
                         dlHideTimer = setTimeout(popOut, 2500);
                     } else {
                         fillEl.style.width = pct + '%';
-                        fillEl.style.background = '#1DB954';
+                        fillEl.style.background = 'var(--spl-accent,#1DB954)';
                         popIn();
                     }
                 };
