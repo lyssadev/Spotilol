@@ -234,6 +234,11 @@ object DownloadManager {
     }
 
     private suspend fun runSingle(appContext: Context, track: TrackMeta) {
+        if (OfflineStore.isTrackSaved(appContext, track.trackId)) {
+            onProgress?.invoke(100, "Already saved")
+            withContext(Dispatchers.Main) { onStatus?.invoke("Already saved to Music/Spotilol") }
+            return
+        }
         activeTrackId = track.trackId
         try {
             val result = runCatching {
