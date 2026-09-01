@@ -32,7 +32,10 @@ class DownloadService : Service() {
 
     private val pollRunnable = object : Runnable {
         override fun run() {
-            if (!DownloadManager.isDownloading() && !DownloadManager.isWorkPending()) {
+            if (!DownloadManager.isDownloading() &&
+                !DownloadManager.isWorkPending() &&
+                !DownloadManager.isBatchActive()
+            ) {
                 stopSelf()
                 return
             }

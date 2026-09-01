@@ -115,7 +115,10 @@ object DownloadManager {
     fun cancelAll() {
         signal = ControlSignal.CANCEL
         var dropped = 0
-        while (jobs.tryReceive().isSuccess) dropped++
+        while (jobs.tryReceive().isSuccess) {
+            pendingJobs.decrementAndGet()
+            dropped++
+        }
         Log.i(TAG, "cancelAll: cancel requested, dropped $dropped queued job(s)")
     }
 
