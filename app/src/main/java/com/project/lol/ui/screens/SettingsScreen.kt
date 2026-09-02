@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
@@ -116,6 +117,9 @@ import com.project.lol.util.DebugLogStore
 import com.project.lol.util.GitHubApi
 import com.project.lol.util.GitHubRelease
 import com.project.lol.util.MarkdownText
+import com.project.lol.webview.helpers.LyricsTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -185,6 +189,7 @@ fun SettingsContent(
     var btAutoPause by remember { mutableStateOf(prefs.getBoolean("BtAutoPause", false)) }
     var btAutoResume by remember { mutableStateOf(prefs.getBoolean("BtAutoResume", false)) }
     var playerMode by remember { mutableStateOf(prefs.getString("PlayerMode", "spotilol") ?: "spotilol") }
+    var lyricsStyle by remember { mutableStateOf(prefs.getString("LyricsStyle", LyricsTheme.DEFAULT_STYLE) ?: LyricsTheme.DEFAULT_STYLE) }
     var connectionMode by remember { mutableStateOf(prefs.getString("ConnectionMode", "normal") ?: "normal") }
     var offlineMode by remember { mutableStateOf(prefs.getBoolean("OfflineMode", false)) }
 
@@ -192,6 +197,7 @@ fun SettingsContent(
     var profiles by remember { mutableStateOf(ProfileManager.getProfiles(context)) }
 
     var showConnectionModeDialog by remember { mutableStateOf(false) }
+    var showLyricsStyleDialog by remember { mutableStateOf(false) }
     var showSaveAccountDialog by remember { mutableStateOf(false) }
     var pendingCookies by remember { mutableStateOf<String?>(null) }
     var accountNameInput by remember { mutableStateOf("") }
@@ -348,6 +354,17 @@ fun SettingsContent(
                 subtitle = playerModeLabel,
                 icon = Icons.Default.PlayCircle,
                 onClick = { showPlayerModeDialog = true }
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+
+            val lyricsStyleLabel = LyricsTheme.STYLE_OPTIONS
+                .firstOrNull { it.first == lyricsStyle }?.second ?: "Fullscreen (Album Colors)"
+            SettingTile(
+                title = "Lyrics Style",
+                subtitle = lyricsStyleLabel,
+                icon = Icons.AutoMirrored.Filled.QueueMusic,
+                onClick = { showLyricsStyleDialog = true }
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
@@ -739,6 +756,19 @@ fun SettingsContent(
                 prefs.edit().putString("PlayerMode", value).apply()
             },
             onDismiss = { showPlayerModeDialog = false }
+        )
+    }
+
+    if (showLyricsStyleDialog) {
+        SingleChoiceDialog(
+            title = "Lyrics Style",
+            options = LyricsTheme.STYLE_OPTIONS,
+            selected = lyricsStyle,
+            onSelect = { value ->
+                lyricsStyle = value
+                prefs.edit().putString("LyricsStyle", value).apply()
+            },
+            onDismiss = { showLyricsStyleDialog = false }
         )
     }
 

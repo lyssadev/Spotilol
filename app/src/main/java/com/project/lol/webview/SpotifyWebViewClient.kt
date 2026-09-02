@@ -227,6 +227,7 @@ class SpotifyWebViewClient(
         val customCss = prefs.getString("CustomCss", "") ?: ""
         val playerMode = prefs.getString("PlayerMode", "spotilol") ?: "spotilol"
         val useProxy = prefs.getString("ConnectionMode", "normal") == "proxy"
+        val lyricsStyle = prefs.getString("LyricsStyle", LyricsTheme.DEFAULT_STYLE) ?: LyricsTheme.DEFAULT_STYLE
 
         val js = buildString {
             append("window.autoPlayMode='$autoPlayMode';\n")
@@ -275,7 +276,8 @@ class SpotifyWebViewClient(
         }
         val cleanJs = JsUtils.stripConsoleLogs(js) + "\n" +
                 buildAmoledJs(amoledEnabled) + "\n" +
-                buildCustomCssJs(customCss)
+                buildCustomCssJs(customCss) + "\n" +
+                LyricsTheme.buildLyricsStyleJs(lyricsStyle)
         if (playerMode == "original") {
             view.evaluateJavascript(cleanJs + "\n(function(){var s=document.createElement('style');s.id='spl-np-show';s.textContent='aside[data-testid=\"now-playing-bar\"]{display:flex!important}';document.head.appendChild(s);})();", null)
         } else {
@@ -295,12 +297,13 @@ class SpotifyWebViewClient(
                 val wv = currentWebView ?: return@OnSharedPreferenceChangeListener
                 val on = prefs.getBoolean("PowerSave", false)
                 wv.evaluateJavascript("if(window.__splApplyPowerSave) window.__splApplyPowerSave($on);", null)
-            } else if (key == "AmoledTheme" || key == "CustomCss") {
+            } else if (key == "AmoledTheme" || key == "CustomCss" || key == "LyricsStyle") {
                 val wv = currentWebView ?: return@OnSharedPreferenceChangeListener
                 val amoled = prefs.getBoolean("AmoledTheme", false)
                 val css = prefs.getString("CustomCss", "") ?: ""
                 wv.evaluateJavascript(buildAmoledJs(amoled), null)
                 wv.evaluateJavascript(buildCustomCssJs(css), null)
+                wv.evaluateJavascript(LyricsTheme.buildLyricsStyleJs(prefs.getString("LyricsStyle", LyricsTheme.DEFAULT_STYLE) ?: LyricsTheme.DEFAULT_STYLE), null)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)

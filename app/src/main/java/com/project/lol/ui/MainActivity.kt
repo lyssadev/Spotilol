@@ -120,6 +120,7 @@ import com.project.lol.util.UpdateChecker
 import com.project.lol.webview.SpotifyWebChromeClient
 import com.project.lol.webview.SpotifyWebViewClient
 import com.project.lol.webview.helpers.DevLogPrelude
+import com.project.lol.webview.helpers.LyricsTheme
 import com.project.lol.webview.helpers.buildAmoledJs
 import com.project.lol.webview.helpers.buildCustomCssJs
 import com.project.lol.webview.injections.LogoutCheck
@@ -1321,6 +1322,7 @@ class MainActivity : ComponentActivity() {
                 append(buildAmoledJs(amoledEnabled))
                 append("\n")
                 append(buildCustomCssJs(customCss))
+                append(LyricsTheme.buildLyricsStyleJs(prefs.getString("LyricsStyle", LyricsTheme.DEFAULT_STYLE) ?: LyricsTheme.DEFAULT_STYLE))
             }
             view.evaluateJavascript(js, null)
 
