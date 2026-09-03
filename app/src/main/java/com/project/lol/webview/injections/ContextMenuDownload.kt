@@ -8,9 +8,17 @@ package com.project.lol.webview.injections
  *
  * - The track (id/title/artists/album/cover) is harvested from the row
  *   DOM at menu-open time via capture-phase listeners on contextmenu
- *   and menu-trigger clicks. Non-track menus (album/playlist headers,
- *   page background) reset the capture, so a stale track can never
- *   leak into the wrong menu.
+ *   and menu-trigger clicks. Non-track menus reset the capture, so a
+ *   stale track can never leak into the wrong menu.
+ * - Menus that must NEVER receive the item:
+ *     1. The profile / user-widget dropdown - it ALSO carries
+ *        data-testid="context-menu", so the observer used to inject a
+ *        stale-track Download item into it (the wrapper
+ *        [data-testid="user-widget-menu"] sits INSIDE the context-menu,
+ *        so it's detected with a descendant query, not .closest()).
+ *     2. Nested submenus opened from menuitems (Add to playlist,
+ *        Share) - their trigger carries aria-expanded, and the capture
+ *        is dropped the moment one is clicked.
  * - The item is built by cloning an existing plain menu entry at
  *   runtime, so hashed Encore classes, hover styling and icon sizing
  *   survive Spotify deploys. Only the icon path (the player's download
@@ -76,6 +84,12 @@ object ContextMenuDownload {
                     return el;
                 }
                 return null;
+            }
+
+            function splIsUserMenu(root){
+                try{
+                    return !!(root && root.querySelector && root.querySelector('[data-testid="user-widget-menu"]'));
+                }catch(e){ return false; }
             }
         
             function splDoMenuDownload(track){
@@ -172,7 +186,15 @@ object ContextMenuDownload {
                 var t = window.__splMenuTrack;
                 if(!t || !t.trackId) return;
                 var root = splActiveMenu();
-                var ul = root ? root.querySelector('ul[role="menu"]') : null;
+                if(!root){
+                    setTimeout(function(){ splTryInject(attempt+1); }, 120);
+                    return;
+                }
+                if(splIsUserMenu(root)){
+                    window.__splMenuTrack = null;
+                    return;
+                }
+                var ul = root.querySelector('ul[role="menu"]');
                 if(!ul){
                     setTimeout(function(){ splTryInject(attempt+1); }, 120);
                     return;
@@ -196,6 +218,24 @@ object ContextMenuDownload {
             document.addEventListener('contextmenu', splCaptureFromEvent, true);
         
             document.addEventListener('click', function(e){
+                var target = e.target;
+                if(!target || !target.closest) return;
+
+                try{
+                    if(target.closest('button[data-testid="user-widget-link"], [data-testid="user-widget-menu"]')){
+                        window.__splMenuTrack = null;
+                        return;
+                    }
+                }catch(err){}
+
+                try{
+                    if(target.closest('[data-testid="context-menu"]') &&
+                       target.closest('button[aria-expanded]')){
+                        window.__splMenuTrack = null;
+                        return;
+                    }
+                }catch(err){}
+
                 var trig = null;
                 try{
                     if(e.target && e.target.closest){
