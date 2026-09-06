@@ -6,6 +6,8 @@ import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.widget.Toast
 import com.project.lol.service.MediaNotificationService
+import com.project.lol.webview.helpers.AdIdStore
+import org.json.JSONArray
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.net.HttpURLConnection
@@ -97,6 +99,24 @@ class SpotifyBridge(activityRef: WeakReference<Activity>) {
             else -> "js"
         }
         com.project.lol.util.DebugLogStore.log(tag, m)
+    }
+
+    /**
+     * Receives the ad audio file IDs harvested by AdStateHook from player
+     * state payloads, as a JSON array of strings. AdIdStore then lets
+     * shouldInterceptRequest redirect exactly those media requests to
+     * silent.mp3.
+     */
+    @JavascriptInterface
+    fun recAdContentIds(json: String?) {
+        val payload = json ?: return
+        val arr = try { JSONArray(payload) } catch (e: Exception) { return }
+        val ids = ArrayList<String>(arr.length())
+        for (i in 0 until arr.length()) {
+            val v = arr.optString(i, "")
+            if (v.isNotEmpty()) ids.add(v)
+        }
+        if (ids.isNotEmpty()) AdIdStore.addAll(ids)
     }
 
     @JavascriptInterface
