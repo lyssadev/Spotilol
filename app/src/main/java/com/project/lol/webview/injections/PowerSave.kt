@@ -89,7 +89,7 @@ object PowerSave {
                             }
                         }
                     });
-                    try{ videoObs.observe(document.body, {childList:true, subtree:true}); }catch(e){}
+                    try{ videoObs.observe(document.body || document.documentElement, {childList:true, subtree:true}); }catch(e){}
 
                     psStyle = document.createElement('style');
                     psStyle.id = 'spl-power-save';

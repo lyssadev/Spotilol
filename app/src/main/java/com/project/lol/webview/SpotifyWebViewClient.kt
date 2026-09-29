@@ -9,6 +9,9 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.ScriptHandler
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.project.lol.webview.helpers.*
 import com.project.lol.webview.injections.*
 import java.io.ByteArrayInputStream
@@ -27,6 +30,10 @@ class SpotifyWebViewClient(
     private var prefsListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
     private var boundPrefs: android.content.SharedPreferences? = null
     private var pageStartedAt = 0L
+    private var docStartHandler: ScriptHandler? = null
+    private var docStartJs: String? = null
+    private var docStartView: WebView? = null
+    private var docStartJustRegistered = false
 
     override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
         super.doUpdateVisitedHistory(view, url, isReload)
@@ -100,28 +107,68 @@ class SpotifyWebViewClient(
                 "hideEmpty=$hideEmptyPlayer playlistSort=$playlistSort scrollbar=$showScrollbar"
         )
 
-        view?.evaluateJavascript("window.__splShowScrollbar=$showScrollbar;", null)
-        view?.evaluateJavascript("window.__spotilolUseProxy=$useProxy;", null)
-        view?.evaluateJavascript("window.__splPowerSavePref=$powerSave;", null)
-        view?.evaluateJavascript("window.__splHideEmpty=$hideEmptyPlayer;", null)
-        view?.evaluateJavascript("window.__splPlaylistSortEnabled=$playlistSort;", null)
-        // FIX: these payloads were injected raw - strip them like every other
-        // injection, served from cache.
-        if (isGoogleAuthUrl(url)) {
-            view?.evaluateJavascript(GoogleSpoof.CONTENT, null)
-        } else {
-            view?.evaluateJavascript(BrowserSpoof.CONTENT, null)
-        }
-        view?.evaluateJavascript(FetchOverride.CONTENT, null)
         AdIdStore.clear()
-        view?.evaluateJavascript(AdStateHook.CONTENT, null)
-        if (blockSW) view?.evaluateJavascript(WorkerNeutralize.CONTENT, null)
-        view?.evaluateJavascript(GaBlocker.CONTENT, null)
-        view?.evaluateJavascript("window.__splPowerSavePref=$powerSave;", null)
-        view?.evaluateJavascript(PowerSave.CONTENT, null)
-        view?.evaluateJavascript(SettingsFix.CONTENT, null)
-        view?.evaluateJavascript(VideoPark.CONTENT, null)
+        if (view == null || prefs == null) return
+
+        // open.spotify.com: the payload is a document-start script (registered in
+        // MainActivity before the first load), so it runs before Spotify's own scripts.
+        // If it had to be (re)registered just now - first run or prefs changed - it may
+        // not apply to this navigation, so also inject it the old way.
+        if (isWebPlayerUrl(url) && installDocumentStartScripts(view) && !docStartJustRegistered) return
+
+        view.evaluateJavascript(buildEarlyJs(prefs, isGoogleAuthUrl(url)), null)
     }
+
+    /**
+     * Registers the early payload for open.spotify.com as a document-start script,
+     * re-registering if prefs changed the payload. Returns false if the WebView doesn't
+     * support DOCUMENT_START_SCRIPT. Sets [docStartJustRegistered] when a (re)registration
+     * happened in this call.
+     */
+    fun installDocumentStartScripts(view: WebView): Boolean {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return false
+        val prefs = view.context.getSharedPreferences("spotilol_prefs", 0)
+        val js = buildEarlyJs(prefs, isGoogle = false)
+        docStartJustRegistered = false
+        if (js == docStartJs && docStartView === view) return true
+        docStartHandler?.remove()
+        docStartHandler = WebViewCompat.addDocumentStartJavaScript(view, js, setOf(WEB_PLAYER_ORIGIN))
+        docStartJs = js
+        docStartView = view
+        docStartJustRegistered = true
+        Logger.i(TAG, "document-start payload registered (${js.length} bytes)")
+        return true
+    }
+
+    private fun buildEarlyJs(prefs: android.content.SharedPreferences, isGoogle: Boolean): String {
+        val useProxy = prefs.getString("ConnectionMode", "normal") == "proxy"
+        val powerSave = prefs.getBoolean("PowerSave", false)
+        val blockSW = prefs.getBoolean("BlockServiceWorker", true)
+        val hideEmptyPlayer = prefs.getBoolean("HideEmptyPlayer", false)
+        val playlistSort = prefs.getBoolean("PlaylistSortEnabled", true)
+        val showScrollbar = prefs.getBoolean("ShowScrollbar", true)
+        // Each payload runs in its own try/catch, matching the old behaviour where each
+        // was a separate evaluateJavascript call and one failure didn't stop the rest.
+        val parts = buildList {
+            add("window.__splShowScrollbar=$showScrollbar;")
+            add("window.__spotilolUseProxy=$useProxy;")
+            add("window.__splPowerSavePref=$powerSave;")
+            add("window.__splHideEmpty=$hideEmptyPlayer;")
+            add("window.__splPlaylistSortEnabled=$playlistSort;")
+            add(if (isGoogle) GoogleSpoof.CONTENT else BrowserSpoof.CONTENT)
+            add(FetchOverride.CONTENT)
+            add(AdStateHook.CONTENT)
+            if (blockSW) add(WorkerNeutralize.CONTENT)
+            add(GaBlocker.CONTENT)
+            add(PowerSave.CONTENT)
+            add(SettingsFix.CONTENT)
+            add(VideoPark.CONTENT)
+        }
+        return parts.joinToString("\n") { "try{\n$it\n}catch(e){}" }
+    }
+
+    private fun isWebPlayerUrl(url: String?): Boolean =
+        url != null && (url == WEB_PLAYER_ORIGIN || url.startsWith("$WEB_PLAYER_ORIGIN/"))
 
     override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
         Logger.e(TAG, "renderer process gone: crashed=${detail?.didCrash()}")
@@ -445,6 +492,7 @@ class SpotifyWebViewClient(
 
     companion object {
         private const val TAG = "wv"
+        private const val WEB_PLAYER_ORIGIN = "https://open.spotify.com"
         private const val DESKTOP_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
 
