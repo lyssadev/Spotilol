@@ -1523,7 +1523,6 @@ class MainActivity : ComponentActivity() {
         webView?.let {
             it.stopLoading()
             it.clearHistory()
-            it.clearCache(true)
             it.clearFormData()
             it.removeJavascriptInterface("AndBridge")
             (it.parent as? ViewGroup)?.removeView(it)

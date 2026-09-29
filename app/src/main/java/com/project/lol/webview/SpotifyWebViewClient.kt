@@ -182,6 +182,10 @@ class SpotifyWebViewClient(
             .getString("ConnectionMode", "normal") == "proxy"
 
         if (!useProxy) {
+            // Only ad-audio candidates and Google auth URLs need the native sniff below.
+            // Everything else goes straight to the WebView, which would otherwise fetch
+            // it a second time after this blocking request returns null.
+            if (!isAdAudioUrl(url) && !isGoogleAuthUrl(url)) return null
             try {
                 val conn = URL(url).openConnection() as HttpURLConnection
                 try {
