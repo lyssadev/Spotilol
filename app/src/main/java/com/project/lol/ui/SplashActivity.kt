@@ -84,6 +84,7 @@ import compose.icons.tablericons.Bell
 import compose.icons.tablericons.Bluetooth
 import compose.icons.tablericons.Language
 import compose.icons.tablericons.ShieldLock
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -110,13 +111,16 @@ class SplashActivity : ComponentActivity() {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
 
-        val analytics = FirebaseAnalytics.getInstance(this)
         FirebaseCrashlytics.getInstance()
-        FirebasePerformance.getInstance()
-        analytics.logEvent(FirebaseAnalytics.Event.APP_OPEN, Bundle().apply {
-            putString(FirebaseAnalytics.Param.SCREEN_NAME, "Spotilol")
-            putString(FirebaseAnalytics.Param.SCREEN_CLASS, "SplashActivity")
-        })
+        // Analytics/Performance are not needed for first frame; init off the main thread.
+        lifecycleScope.launch(Dispatchers.Default) {
+            FirebasePerformance.getInstance()
+            FirebaseAnalytics.getInstance(this@SplashActivity)
+                .logEvent(FirebaseAnalytics.Event.APP_OPEN, Bundle().apply {
+                    putString(FirebaseAnalytics.Param.SCREEN_NAME, "Spotilol")
+                    putString(FirebaseAnalytics.Param.SCREEN_CLASS, "SplashActivity")
+                })
+        }
 
         setContent {
             val prefs = remember { getSharedPreferences("spotilol_prefs", MODE_PRIVATE) }
@@ -153,7 +157,6 @@ class SplashActivity : ComponentActivity() {
                     finish()
                     return@LaunchedEffect
                 }
-                delay(2000)
                 intro = false
                 if (prefs.getBoolean("OnboardingDone", false)) {
                     checking = true
@@ -169,11 +172,10 @@ class SplashActivity : ComponentActivity() {
                     if (prefs.getString("ConnectionMode", "normal") == "proxy") {
                         LocalProxyManager.init(this@SplashActivity)
                         LocalProxyManager.start()
-                        delay(800)
+                        awaitProxyBound()
                         certInstalled = LocalProxyManager.isCAInstalled()
                     } else {
                         LocalProxyManager.stop()
-                        delay(600)
                         certInstalled = true
                     }
                     checkDone = true
@@ -187,7 +189,7 @@ class SplashActivity : ComponentActivity() {
                     animate(
                         initialValue = 1f,
                         targetValue = 0f,
-                        animationSpec = tween(500, easing = LinearEasing)
+                        animationSpec = tween(150, easing = LinearEasing)
                     ) { value, _ -> contentAlpha = value }
                     val linkIntent = intent?.takeIf { it.action == Intent.ACTION_VIEW && it.data != null }
                     startActivity(
@@ -233,7 +235,6 @@ class SplashActivity : ComponentActivity() {
                                         onboardingAppear.animateTo(0f, tween(200, easing = LinearEasing))
                                         onboarding = false
                                         checking = true
-                                        delay(2000)
                                         checkTrigger++
                                     }
                                 }
@@ -268,7 +269,7 @@ class SplashActivity : ComponentActivity() {
                                         withContext(Dispatchers.IO) {
                                             if (!LocalProxyManager.isRunning) {
                                                 LocalProxyManager.start()
-                                                delay(500)
+                                                awaitProxyBound()
                                             }
                                             certInstalled = LocalProxyManager.isCAInstalled()
                                         }
@@ -293,6 +294,12 @@ class SplashActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** start() binds asynchronously; wait for the socket instead of a fixed sleep. */
+    private suspend fun awaitProxyBound(timeoutMs: Long = 2000) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (!LocalProxyManager.isRunning && System.currentTimeMillis() < deadline) delay(25)
     }
 
     private fun requiredPermissions(): List<String> {
