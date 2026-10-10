@@ -197,6 +197,7 @@ class SpotifyWebViewClient(
             add(PowerSave.CONTENT)
             add(SettingsFix.CONTENT)
             add(VideoPark.CONTENT)
+            add(NavDuck.CONTENT)
         }
         return parts.joinToString("\n") { "try{\n$it\n}catch(e){}" }
     }
